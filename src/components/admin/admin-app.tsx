@@ -81,6 +81,17 @@ export default function AdminApp() {
   // Discord link reminder (owner): stored timestamp age >= 30 days.
   const [discordReminderShown, setDiscordReminderShown] = useState(false);
 
+  // Discord link validity status (owner): green/red badge next to Discord button.
+  // null = not checked yet, true = valid, false = expired/invalid, "checking" = in progress.
+  type DiscordStatus = null | boolean | "checking";
+  const [discordStatus, setDiscordStatus] = useState<DiscordStatus>(null);
+  const [discordInfo, setDiscordInfo] = useState<{
+    guildName?: string | null;
+    members?: number | null;
+    expiresAt?: string | null;
+  }>({});
+  const [discordCheckedAt, setDiscordCheckedAt] = useState<number | null>(null);
+
   // Track
   const [trackInput, setTrackInput] = useState("");
   const [trackResult, setTrackResult] = useState<PublicOrder | null | "not-found">(
@@ -188,6 +199,41 @@ export default function AdminApp() {
     }, 12000);
     return () => window.clearInterval(interval);
   }, [role, hasData, loadData]);
+
+  // ── Discord link validity checker (owner only) ───────────────────────────
+  // Checks on first admin data load, then every 15 minutes. Owner can also
+  // force a recheck by clicking the status dot.
+  const checkDiscordLink = useCallback(async () => {
+    setDiscordStatus("checking");
+    try {
+      const res = await api<{
+        valid: boolean;
+        guildName?: string | null;
+        approximateMembers?: number | null;
+        expiresAt?: string | null;
+        checkedAt: number;
+      }>("/api/admin/discord/check");
+      setDiscordStatus(res.valid);
+      setDiscordInfo({
+        guildName: res.guildName,
+        members: res.approximateMembers,
+        expiresAt: res.expiresAt,
+      });
+      setDiscordCheckedAt(res.checkedAt);
+    } catch {
+      // Don't toast on failure — it's a background check, not a user action.
+      setDiscordStatus(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (role !== "owner" || !hasData) return;
+    void checkDiscordLink();
+    const interval = window.setInterval(() => {
+      void checkDiscordLink();
+    }, 15 * 60 * 1000); // every 15 minutes
+    return () => window.clearInterval(interval);
+  }, [role, hasData, checkDiscordLink]);
 
   // ── Role application ────────────────────────────────────────────────────
   function applyRole(name: string, r: Role) {
@@ -583,8 +629,48 @@ export default function AdminApp() {
                 <button
                   className="btn btn-sm"
                   onClick={() => setDiscordOpen(true)}
+                  title={
+                    discordStatus === true
+                      ? `Discord link valid${
+                          discordInfo.guildName
+                            ? " — " + discordInfo.guildName
+                            : ""
+                        }${
+                          discordInfo.members
+                            ? " (" + discordInfo.members + " members)"
+                            : ""
+                        }`
+                      : discordStatus === false
+                      ? "Discord link is expired or invalid — click to replace"
+                      : discordStatus === "checking"
+                      ? "Checking Discord link…"
+                      : "Discord link"
+                  }
                 >
                   🎮 Discord
+                  {role === "owner" && (
+                    <span
+                      className={
+                        "discord-status-dot" +
+                        (discordStatus === true
+                          ? " ok"
+                          : discordStatus === false
+                          ? " bad"
+                          : discordStatus === "checking"
+                          ? " checking"
+                          : "")
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (discordStatus !== "checking") {
+                          void checkDiscordLink();
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Recheck Discord link status"
+                    />
+                  )}
                 </button>
                 <button
                   className="btn btn-sm"
@@ -762,6 +848,8 @@ export default function AdminApp() {
           } catch {
             // ignore storage failure
           }
+          // Recheck the new link's validity immediately.
+          void checkDiscordLink();
         }}
       />
       <WhitelistModal open={whitelistOpen} onClose={() => setWhitelistOpen(false)} />
