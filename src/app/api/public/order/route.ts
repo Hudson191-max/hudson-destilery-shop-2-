@@ -6,6 +6,7 @@ import {
   todayISO,
   type OrderLine,
 } from "@/lib/types";
+import { randomBytes } from "crypto";
 
 export interface CreateOrderBody {
   customer: string;
@@ -17,8 +18,16 @@ export interface CreateOrderBody {
   company?: string;
 }
 
+// Cryptographically secure cancel code: 8 chars from [A-Z0-9] (excludes
+// ambiguous chars 0/O/1/I for readability). ~34^8 ≈ 1.8 trillion combinations.
 function generateCancelCode(): string {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(8);
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += alphabet[bytes[i] % alphabet.length];
+  }
+  return code;
 }
 
 export async function POST(req: Request) {
