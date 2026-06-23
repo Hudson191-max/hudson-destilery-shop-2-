@@ -219,7 +219,10 @@ function TosBlock({ open, onToggle }: { open: boolean; onToggle: () => void }) {
         aria-expanded={open}
       >
         <span>Terms of Service</span>
-        <span>View</span>
+        <span>
+          {open ? "Hide" : "View"}
+          <span className="tos-chevron">&#9660;</span>
+        </span>
       </button>
       <div className={"tos-body" + (open ? " open" : "")}>
         <p>By placing an order, you agree to the following:</p>

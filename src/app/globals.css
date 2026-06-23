@@ -965,18 +965,40 @@ tbody tr:hover td {
   cursor: pointer;
   text-align: left;
 }
-.tos-toggle span {
+.tos-toggle span:last-child {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 1px;
   color: var(--text2);
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s;
+}
+.tos-toggle:hover span:last-child {
+  color: var(--accent);
+}
+.tos-toggle .tos-chevron {
+  display: inline-block;
+  transition: transform 0.25s ease;
+  font-size: 9px;
+}
+.tos-toggle[aria-expanded="true"] .tos-chevron {
+  transform: rotate(180deg);
 }
 .tos-body {
-  padding: 0 14px 14px;
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 14px;
   line-height: 1.6;
   color: var(--text1);
   font-size: 13px;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+.tos-body.open {
+  max-height: 600px;
+  padding: 0 14px 14px;
 }
 .tos-body p {
   margin-bottom: 8px;
