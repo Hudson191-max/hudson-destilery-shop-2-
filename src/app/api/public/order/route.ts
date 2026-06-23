@@ -7,6 +7,7 @@ import {
   type OrderLine,
 } from "@/lib/types";
 import { randomBytes } from "crypto";
+import { notifyNewOrder } from "@/lib/discord-webhook";
 
 export interface CreateOrderBody {
   customer: string;
@@ -115,6 +116,18 @@ export async function POST(req: Request) {
 
   if (insertRes.error || !insertRes.data)
     return errorJson("Failed to create order.", 500);
+
+  // Fire-and-forget Discord webhook notification. Never blocks the response.
+  void notifyNewOrder({
+    orderId: insertRes.data.id,
+    customer,
+    contact: body.contact,
+    steam: body.steam,
+    notes: body.notes,
+    lines,
+    total,
+    createdBy: "customer",
+  });
 
   return json({
     id: insertRes.data.id,

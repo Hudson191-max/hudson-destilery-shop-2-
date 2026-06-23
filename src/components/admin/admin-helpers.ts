@@ -20,6 +20,7 @@ export interface AdminData {
   stockLog: StockLogRow[];
   siteStatus: { closed: boolean; message: string };
   discordLink: string;
+  discordWebhookUrl: string;
   role: "employee" | "owner" | "customer";
   user: string;
 }

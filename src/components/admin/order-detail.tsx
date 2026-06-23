@@ -1,9 +1,10 @@
 "use client";
-// Order detail modal body + receipt/copy/print/image/slip actions.
-import { useCallback } from "react";
+// Order detail modal body + receipt/copy/print/image/slip actions + edit mode.
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError } from "@/lib/api-client";
 import { Modal } from "@/components/modal";
 import { toast } from "@/lib/toast";
-import { CURRENCY, type InventoryRow } from "@/lib/types";
+import { CURRENCY, type InventoryRow, type OrderLine } from "@/lib/types";
 import {
   buildOrderDiscordText,
   buildOrderReceiptMarkup,
@@ -31,6 +32,7 @@ interface Props {
   inventory: InventoryRow[];
   onClose: () => void;
   onChangeStatus: (id: number | string, status: string) => Promise<void>;
+  onEdited?: () => void;
 }
 
 export function OrderDetailModal({
@@ -39,7 +41,72 @@ export function OrderDetailModal({
   inventory,
   onClose,
   onChangeStatus,
+  onEdited,
 }: Props) {
+  // ── Edit mode state ──────────────────────────────────────────────────────
+  const [editing, setEditing] = useState(false);
+  const [editCustomer, setEditCustomer] = useState("");
+  const [editContact, setEditContact] = useState("");
+  const [editSteam, setEditSteam] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editLines, setEditLines] = useState<
+    Record<string, number>
+  >({});
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Sync edit fields when modal opens or order changes.
+  useEffect(() => {
+    if (open && order) {
+      setEditing(false);
+      setEditCustomer(order.customer || "");
+      setEditContact(order.contact || "");
+      setEditSteam(order.steam || "");
+      setEditNotes(order.notes || "");
+      const m: Record<string, number> = {};
+      for (const l of order.parsedLines) {
+        m[String(l.itemId)] = l.qty;
+      }
+      setEditLines(m);
+    }
+  }, [open, order]);
+
+  async function handleSaveEdit() {
+    if (!order) return;
+    if (!editCustomer.trim()) {
+      toast("Customer name required.", "err");
+      return;
+    }
+    const items = Object.entries(editLines)
+      .filter(([, qty]) => qty > 0)
+      .map(([itemId, qty]) => ({ itemId, qty }));
+    if (items.length === 0) {
+      toast("Add at least one item.", "err");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await api("/api/admin/order/edit", {
+        method: "POST",
+        body: {
+          id: order.id,
+          customer: editCustomer.trim(),
+          contact: editContact.trim(),
+          steam: editSteam.trim(),
+          notes: editNotes.trim(),
+          lines: items,
+        },
+      });
+      toast(`Order #${order.id} updated.`, "ok");
+      setEditing(false);
+      if (onEdited) onEdited();
+    } catch (e) {
+      const err = e as ApiError;
+      toast("Edit failed", "err", err.detail || err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   const handleCopyDiscord = useCallback(async () => {
     if (!order) return;
     const text = buildOrderDiscordText({
@@ -192,195 +259,401 @@ export function OrderDetailModal({
     status !== "Done" &&
     status !== "Cancelled" &&
     status !== "Ready for Delivery";
+  const canEdit = canCancel;
+
+  const editTotal = Object.entries(editLines)
+    .filter(([, qty]) => qty > 0)
+    .reduce((sum, [itemId, qty]) => {
+      const item = inventory.find((i) => String(i.id) === itemId);
+      return sum + (item ? item.price * qty : 0);
+    }, 0);
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`Order #${o.id} — ${o.customer}`}
+      title={editing ? `Edit Order #${o.id}` : `Order #${o.id} — ${o.customer}`}
       width="min(560px, 92vw)"
     >
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
-        <Field label="CUSTOMER">
-          <span style={{ fontWeight: 600, color: "var(--text0)" }}>
-            {o.customer}
-          </span>
-        </Field>
-        <Field label="CONTACT">
-          <span>{o.contact || "—"}</span>
-        </Field>
-        <Field label="STEAM ID">
-          <span className="td-mono" style={{ fontSize: 12 }}>
-            {o.steam || "—"}
-          </span>
-        </Field>
-        <Field label="STATUS">
-          <span className={statusBadgeClass(status)}>{status}</span>
-        </Field>
-        <Field label="DATE">
-          <span>{o.date || "—"}</span>
-        </Field>
-      </div>
+      {editing ? (
+        <div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div className="form-group">
+              <label>Customer *</label>
+              <input
+                value={editCustomer}
+                onChange={(e) => setEditCustomer(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Contact</label>
+              <input
+                value={editContact}
+                onChange={(e) => setEditContact(e.target.value)}
+                placeholder="Discord / phone"
+              />
+            </div>
+            <div className="form-group">
+              <label>Steam ID</label>
+              <input
+                value={editSteam}
+                onChange={(e) => setEditSteam(e.target.value)}
+                className="td-mono"
+                style={{ fontSize: 12 }}
+              />
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <span className={statusBadgeClass(status)}>{status}</span>
+              <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>
+                Status can't be edited here — use the action buttons after saving.
+              </div>
+            </div>
+          </div>
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label>Notes</label>
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              rows={2}
+            />
+          </div>
 
-      {o.notes ? (
-        <div
-          style={{
-            background: "rgba(200,168,75,.07)",
-            border: "1px solid rgba(200,168,75,.2)",
-            borderRadius: 4,
-            padding: "10px 14px",
-            marginBottom: 16,
-            fontSize: 13,
-            color: "var(--text1)",
-          }}
-        >
-          <span
+          <div
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 10,
-              color: "var(--accent)",
+              color: "var(--text2)",
               letterSpacing: 1,
-              display: "block",
-              marginBottom: 4,
+              marginBottom: 8,
             }}
           >
-            📝 NOTES
-          </span>
-          {o.notes}
-        </div>
-      ) : null}
-
-      <div
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          color: "var(--text2)",
-          letterSpacing: 1,
-          marginBottom: 8,
-        }}
-      >
-        ITEMS
-      </div>
-      <div
-        className="order-lines"
-        style={{ marginBottom: hasShortage ? 8 : 16 }}
-      >
-        {lines.map((l, idx) => {
-          const item = inventory.find((i) => i.id === l.itemId);
-          const inStock = item ? item.stock : 0;
-          const shortage = Math.max(0, l.qty - inStock);
-          return (
-            <div className="order-line" key={idx}>
-              <span className="order-line-name">{l.name}</span>
-              {shortage > 0 ? (
-                <ShortageTag shortage={shortage} />
-              ) : (
-                <InStockTag />
-              )}
-              <span style={{ color: "var(--text2)", fontSize: 12 }}>
-                ×{l.qty}
+            ITEMS (set qty to 0 to remove)
+          </div>
+          <div className="order-lines" style={{ marginBottom: 8 }}>
+            {inventory.map((item) => {
+              const qty = editLines[String(item.id)] || 0;
+              const selected = qty > 0;
+              return (
+                <div
+                  className="order-line"
+                  key={item.id}
+                  style={{
+                    opacity: selected ? 1 : 0.5,
+                    cursor: "pointer",
+                  }}
+                  onClick={() =>
+                    setEditLines((m) => ({
+                      ...m,
+                      [String(item.id)]: selected ? 0 : 1,
+                    }))
+                  }
+                >
+                  <span className="order-line-name">{item.name}</span>
+                  <span style={{ color: "var(--text2)", fontSize: 12 }}>
+                    {item.price.toLocaleString()} {CURRENCY}
+                  </span>
+                  {selected ? (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() =>
+                          setEditLines((m) => ({
+                            ...m,
+                            [String(item.id)]: Math.max(0, qty - 1),
+                          }))
+                        }
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        value={qty}
+                        onChange={(e) =>
+                          setEditLines((m) => ({
+                            ...m,
+                            [String(item.id)]: Math.max(
+                              0,
+                              Number(e.target.value) || 0
+                            ),
+                          }))
+                        }
+                        style={{ width: 48, textAlign: "center" }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() =>
+                          setEditLines((m) => ({
+                            ...m,
+                            [String(item.id)]: qty + 1,
+                          }))
+                        }
+                      >
+                        +
+                      </button>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: "var(--text2)" }}>
+                      click to add
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            <div
+              className="order-line"
+              style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: 8,
+                marginTop: 4,
+              }}
+            >
+              <span
+                className="order-line-name"
+                style={{ fontWeight: 600, color: "var(--text0)" }}
+              >
+                New Total
               </span>
-              <span className="order-line-price">
-                {(l.qty * l.price).toLocaleString()} {CURRENCY}
+              <span
+                className="order-line-price"
+                style={{
+                  fontSize: 15,
+                  color: "var(--accent)",
+                  fontWeight: 600,
+                }}
+              >
+                {editTotal.toLocaleString()} {CURRENCY}
               </span>
             </div>
-          );
-        })}
-        <div
-          className="order-line"
-          style={{
-            borderTop: "1px solid var(--border)",
-            paddingTop: 8,
-            marginTop: 4,
-          }}
-        >
-          <span
-            className="order-line-name"
-            style={{ fontWeight: 600, color: "var(--text0)" }}
-          >
-            Total
-          </span>
-          <span
-            className="order-line-price"
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="btn btn-accent"
+              onClick={() => void handleSaveEdit()}
+              disabled={editSaving}
+            >
+              {editSaving ? "Saving…" : "✓ Save changes"}
+            </button>
+            <button
+              className="btn"
+              onClick={() => setEditing(false)}
+              disabled={editSaving}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div
             style={{
-              fontSize: 15,
-              color: "var(--accent)",
-              fontWeight: 600,
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+              marginBottom: 16,
             }}
           >
-            {o.total.toLocaleString()} {CURRENCY}
-          </span>
-        </div>
-      </div>
+            <Field label="CUSTOMER">
+              <span style={{ fontWeight: 600, color: "var(--text0)" }}>
+                {o.customer}
+              </span>
+            </Field>
+            <Field label="CONTACT">
+              <span>{o.contact || "—"}</span>
+            </Field>
+            <Field label="STEAM ID">
+              <span className="td-mono" style={{ fontSize: 12 }}>
+                {o.steam || "—"}
+              </span>
+            </Field>
+            <Field label="STATUS">
+              <span className={statusBadgeClass(status)}>{status}</span>
+            </Field>
+            <Field label="DATE">
+              <span>{o.date || "—"}</span>
+            </Field>
+          </div>
 
-      {hasShortage ? (
-        <div
-          style={{
-            background: "rgba(224,92,92,.08)",
-            border: "1px solid rgba(224,92,92,.25)",
-            borderRadius: 4,
-            padding: "10px 14px",
-            marginBottom: 16,
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            color: "var(--red)",
-          }}
-        >
-          ⚠ This order has items not fully in stock
-        </div>
-      ) : null}
+          {o.notes ? (
+            <div
+              style={{
+                background: "rgba(200,168,75,.07)",
+                border: "1px solid rgba(200,168,75,.2)",
+                borderRadius: 4,
+                padding: "10px 14px",
+                marginBottom: 16,
+                fontSize: 13,
+                color: "var(--text1)",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: "var(--accent)",
+                  letterSpacing: 1,
+                  display: "block",
+                  marginBottom: 4,
+                }}
+              >
+                📝 NOTES
+              </span>
+              {o.notes}
+            </div>
+          ) : null}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {canDeliver ? (
-          <button
-            className="btn btn-accent"
-            onClick={() => {
-              void onChangeStatus(o.id, "Ready for Delivery");
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: "var(--text2)",
+              letterSpacing: 1,
+              marginBottom: 8,
             }}
           >
-            🚚 Push to delivery
-          </button>
-        ) : null}
-        {status === "Ready for Delivery" ? (
-          <button
-            className="btn btn-accent"
-            onClick={() => {
-              void onChangeStatus(o.id, "Done");
-            }}
+            ITEMS
+          </div>
+          <div
+            className="order-lines"
+            style={{ marginBottom: hasShortage ? 8 : 16 }}
           >
-            ✓ Mark delivered
-          </button>
-        ) : null}
-        {canCancel ? (
-          <button
-            className="btn btn-red"
-            onClick={() => {
-              void onChangeStatus(o.id, "Cancelled");
-            }}
-          >
-            ✕ Cancel
-          </button>
-        ) : null}
-        <button className="btn" onClick={handleCopyDiscord}>
-          📋 Copy for Discord
-        </button>
-        <button className="btn" onClick={handleCopyReceiptImage}>
-          📷 Copy image
-        </button>
-        <button className="btn" onClick={handlePrintReceipt}>
-          🖨 Print receipt
-        </button>
-        <button className="btn" onClick={handleCopySlip}>
-          🖨️ Copy slip
-        </button>
-      </div>
+            {lines.map((l, idx) => {
+              const item = inventory.find((i) => i.id === l.itemId);
+              const inStock = item ? item.stock : 0;
+              const shortage = Math.max(0, l.qty - inStock);
+              return (
+                <div className="order-line" key={idx}>
+                  <span className="order-line-name">{l.name}</span>
+                  {shortage > 0 ? (
+                    <ShortageTag shortage={shortage} />
+                  ) : (
+                    <InStockTag />
+                  )}
+                  <span style={{ color: "var(--text2)", fontSize: 12 }}>
+                    ×{l.qty}
+                  </span>
+                  <span className="order-line-price">
+                    {(l.qty * l.price).toLocaleString()} {CURRENCY}
+                  </span>
+                </div>
+              );
+            })}
+            <div
+              className="order-line"
+              style={{
+                borderTop: "1px solid var(--border)",
+                paddingTop: 8,
+                marginTop: 4,
+              }}
+            >
+              <span
+                className="order-line-name"
+                style={{ fontWeight: 600, color: "var(--text0)" }}
+              >
+                Total
+              </span>
+              <span
+                className="order-line-price"
+                style={{
+                  fontSize: 15,
+                  color: "var(--accent)",
+                  fontWeight: 600,
+                }}
+              >
+                {o.total.toLocaleString()} {CURRENCY}
+              </span>
+            </div>
+          </div>
+
+          {hasShortage ? (
+            <div
+              style={{
+                background: "rgba(224,92,92,.08)",
+                border: "1px solid rgba(224,92,92,.25)",
+                borderRadius: 4,
+                padding: "10px 14px",
+                marginBottom: 16,
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--red)",
+              }}
+            >
+              ⚠ This order has items not fully in stock
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {canDeliver ? (
+              <button
+                className="btn btn-accent"
+                onClick={() => {
+                  void onChangeStatus(o.id, "Ready for Delivery");
+                }}
+              >
+                🚚 Push to delivery
+              </button>
+            ) : null}
+            {status === "Ready for Delivery" ? (
+              <button
+                className="btn btn-accent"
+                onClick={() => {
+                  void onChangeStatus(o.id, "Done");
+                }}
+              >
+                ✓ Mark delivered
+              </button>
+            ) : null}
+            {canCancel ? (
+              <button
+                className="btn btn-red"
+                onClick={() => {
+                  void onChangeStatus(o.id, "Cancelled");
+                }}
+              >
+                ✕ Cancel
+              </button>
+            ) : null}
+            {canEdit ? (
+              <button
+                className="btn"
+                onClick={() => setEditing(true)}
+                title="Edit order details"
+              >
+                ✏ Edit
+              </button>
+            ) : null}
+            <button className="btn" onClick={handleCopyDiscord}>
+              📋 Copy for Discord
+            </button>
+            <button className="btn" onClick={handleCopyReceiptImage}>
+              📷 Copy image
+            </button>
+            <button className="btn" onClick={handlePrintReceipt}>
+              🖨 Print receipt
+            </button>
+            <button className="btn" onClick={handleCopySlip}>
+              🖨️ Copy slip
+            </button>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }

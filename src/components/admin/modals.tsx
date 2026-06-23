@@ -746,36 +746,42 @@ export function SiteStatusModal({
 interface DiscordProps {
   open: boolean;
   currentUrl: string;
+  currentWebhookUrl: string;
   onClose: () => void;
-  onSaved: (url: string) => void;
+  onSaved: (url: string, webhookUrl: string) => void;
 }
 
 export function DiscordModal({
   open,
   currentUrl,
+  currentWebhookUrl,
   onClose,
   onSaved,
 }: DiscordProps) {
   const [url, setUrl] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (open) setUrl(currentUrl || "");
-  }, [open, currentUrl]);
+    if (open) {
+      setUrl(currentUrl || "");
+      setWebhookUrl(currentWebhookUrl || "");
+    }
+  }, [open, currentUrl, currentWebhookUrl]);
 
   async function submit() {
     if (!url.trim()) {
-      toast("Enter a link", "err");
+      toast("Enter a Discord invite link", "err");
       return;
     }
     setSubmitting(true);
     try {
       await api("/api/admin/discord", {
         method: "POST",
-        body: { url: url.trim() },
+        body: { url: url.trim(), webhookUrl: webhookUrl.trim() },
       });
-      onSaved(url.trim());
-      toast("Discord invite link saved", "ok");
+      onSaved(url.trim(), webhookUrl.trim());
+      toast("Discord settings saved", "ok");
       onClose();
     } catch (e) {
       const err = e as ApiError;
@@ -789,7 +795,7 @@ export function DiscordModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Discord link"
+      title="Discord settings"
       footer={
         <>
           <button className="btn" onClick={onClose}>
@@ -800,23 +806,37 @@ export function DiscordModal({
             onClick={() => void submit()}
             disabled={submitting}
           >
-            {submitting ? "Saving…" : "Save link"}
+            {submitting ? "Saving…" : "Save"}
           </button>
         </>
       }
     >
       <div className="form-group" style={{ marginBottom: 16 }}>
-        <label>Discord invite link</label>
+        <label>Discord invite link (public)</label>
         <input
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://discord.gg/..."
         />
+        <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>
+          Shown on the customer order page. Update it whenever your invite expires.
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 16 }}>
-        This link is shown on the customer order page. Update it whenever your
-        invite expires.
+      <div className="form-group" style={{ marginBottom: 16 }}>
+        <label>Staff webhook URL (private)</label>
+        <input
+          type="url"
+          value={webhookUrl}
+          onChange={(e) => setWebhookUrl(e.target.value)}
+          placeholder="https://discord.com/api/webhooks/..."
+        />
+        <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>
+          <strong>How to create:</strong> Discord server → channel settings →
+          Integrations → Webhooks → New Webhook → Copy URL.
+          <br />
+          When set, new orders auto-ping this channel. Leave empty to disable.
+        </div>
       </div>
     </Modal>
   );

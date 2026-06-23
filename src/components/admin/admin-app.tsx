@@ -197,7 +197,19 @@ export default function AdminApp() {
     const interval = window.setInterval(() => {
       void loadData(true);
     }, 12000);
-    return () => window.clearInterval(interval);
+    // ── Auto-refresh when the tab regains focus ───────────────────────────
+    // Staff often switch away from the admin tab and back — immediately fetch
+    // fresh data on focus instead of waiting for the next 12s tick.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadData(true);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [role, hasData, loadData]);
 
   // ── Discord link validity checker (owner only) ───────────────────────────
@@ -481,6 +493,7 @@ export default function AdminApp() {
   const stockLog = data?.stockLog ?? [];
   const siteStatus = data?.siteStatus ?? { closed: false, message: "" };
   const discordLink = data?.discordLink ?? "https://discord.gg/anAmr5MQF";
+  const discordWebhookUrl = data?.discordWebhookUrl ?? "";
 
   const isOwner = role === "owner";
   const isCustomer = role === "customer";
@@ -606,7 +619,19 @@ export default function AdminApp() {
             <div className="header-tag" id="clock">
               {clock}
             </div>
-            <div className="header-tag">{refreshStatus}</div>
+            <div className="header-tag" title="Auto-refreshes every 12 seconds and when this tab regains focus">
+              <span
+                className={
+                  "live-dot" +
+                  (refreshing
+                    ? " pulsing"
+                    : refreshStatus.startsWith("Refresh failed")
+                    ? " bad"
+                    : " ok")
+                }
+              />
+              {refreshStatus}
+            </div>
             {!isCustomer ? (
               <button
                 className="btn btn-sm"
@@ -836,9 +861,14 @@ export default function AdminApp() {
       <DiscordModal
         open={discordOpen}
         currentUrl={discordLink}
+        currentWebhookUrl={discordWebhookUrl}
         onClose={() => setDiscordOpen(false)}
-        onSaved={(url) => {
-          setData((d) => (d ? { ...d, discordLink: url } : d));
+        onSaved={(url, webhookUrl) => {
+          setData((d) =>
+            d
+              ? { ...d, discordLink: url, discordWebhookUrl: webhookUrl }
+              : d
+          );
           try {
             window.localStorage.setItem(
               "hd_discord_link_updated_at",
@@ -866,6 +896,7 @@ export default function AdminApp() {
           setOrderDetailTargetId(null);
         }}
         onChangeStatus={changeOrderStatus}
+        onEdited={() => void loadData(false)}
       />
     </>
   );

@@ -1,6 +1,7 @@
 import { getSupabase } from "@/lib/supabase";
 import { json, errorJson, requireStaff } from "@/lib/api-helpers";
 import { todayISO, type OrderLine } from "@/lib/types";
+import { notifyNewOrder } from "@/lib/discord-webhook";
 
 export async function POST(req: Request) {
   const session = await requireStaff();
@@ -48,6 +49,18 @@ export async function POST(req: Request) {
     who: session.user,
     ts: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     date: todayISO(),
+  });
+
+  // Fire-and-forget Discord webhook notification.
+  void notifyNewOrder({
+    orderId: res.data.id,
+    customer,
+    contact: body.contact,
+    steam: null,
+    notes: body.notes,
+    lines: lines as OrderLine[],
+    total,
+    createdBy: session.user,
   });
 
   return json({ id: res.data.id });
