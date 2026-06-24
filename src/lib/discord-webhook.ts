@@ -2,8 +2,14 @@ import { getSupabase } from "./supabase";
 import { CURRENCY, type OrderLine } from "./types";
 
 // ── Discord webhook helper ───────────────────────────────────────────────────
-// Sends notifications to a staff Discord channel via an incoming webhook URL
-// stored in the `settings` table under key `discord_webhook_url`.
+// Two separate webhook URLs are supported so staff can route notifications to
+// different Discord channels:
+//
+//   • discord_webhook_url        — real-time pings when new orders come in
+//   • discord_backup_webhook_url — daily JSON backup file attachment
+//
+// If the backup webhook is empty, backups fall back to the orders webhook so
+// nothing breaks in single-channel setups.
 //
 // All network failures are swallowed — a notification failure must NEVER break
 // the user's order flow or admin action. We just try, and move on.
@@ -19,16 +25,29 @@ interface OrderNotificationData {
   createdBy?: string | null;
 }
 
-async function getWebhookUrl(): Promise<string | null> {
+async function getSetting(key: string): Promise<string | null> {
   const sb = getSupabase();
   const { data } = await sb
     .from("settings")
     .select("value")
-    .eq("key", "discord_webhook_url")
+    .eq("key", key)
     .maybeSingle();
   const url = String(data?.value || "").trim();
   if (!url || !url.startsWith("http")) return null;
   return url;
+}
+
+// Webhook for real-time order pings.
+async function getOrderWebhookUrl(): Promise<string | null> {
+  return getSetting("discord_webhook_url");
+}
+
+// Webhook for daily backup file attachments. Falls back to the orders webhook
+// when not configured, so a single-webhook setup still receives backups.
+async function getBackupWebhookUrl(): Promise<string | null> {
+  const dedicated = await getSetting("discord_backup_webhook_url");
+  if (dedicated) return dedicated;
+  return getOrderWebhookUrl();
 }
 
 function buildOrderEmbed(d: OrderNotificationData) {
@@ -56,7 +75,7 @@ function buildOrderEmbed(d: OrderNotificationData) {
 
 export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
   try {
-    const url = await getWebhookUrl();
+    const url = await getOrderWebhookUrl();
     if (!url) return; // No webhook configured — silent no-op.
 
     const payload = {
@@ -80,13 +99,18 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
 }
 
 // ── Backup notification (used by the daily cron) ─────────────────────────────
+// Uses the dedicated backup webhook when set, otherwise falls back to the
+// orders webhook. Returns an explicit ok/error so the cron route can report
+// delivery failures (unlike order pings, a failed backup is something the
+// owner genuinely needs to know about).
 export async function notifyBackupAttachment(
   jsonContent: string,
   filename: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; usedFallback: boolean }> {
   try {
-    const url = await getWebhookUrl();
-    if (!url) return { ok: false, error: "No webhook URL configured." };
+    const dedicated = await getSetting("discord_backup_webhook_url");
+    const url = dedicated ? dedicated : await getOrderWebhookUrl();
+    if (!url) return { ok: false, error: "No webhook URL configured.", usedFallback: false };
 
     // Discord webhooks accept multipart/form-data with a file payload field.
     // The JSON content is sent as an uploaded file attachment.
@@ -106,10 +130,18 @@ export async function notifyBackupAttachment(
       cache: "no-store",
     });
     if (!res.ok && res.status !== 204) {
-      return { ok: false, error: `Discord returned HTTP ${res.status}` };
+      return {
+        ok: false,
+        error: `Discord returned HTTP ${res.status}`,
+        usedFallback: !dedicated,
+      };
     }
-    return { ok: true };
+    return { ok: true, usedFallback: !dedicated };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "network error" };
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "network error",
+      usedFallback: false,
+    };
   }
 }

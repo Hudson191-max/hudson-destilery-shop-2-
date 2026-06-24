@@ -23,6 +23,7 @@ export interface AdminData {
   siteStatus: { closed: boolean; message: string };
   discordLink: string;
   discordWebhookUrl: string;
+  discordBackupWebhookUrl: string;
   role: "employee" | "owner" | "customer";
   user: string;
 }

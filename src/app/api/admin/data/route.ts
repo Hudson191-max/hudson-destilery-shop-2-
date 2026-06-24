@@ -33,7 +33,7 @@ export async function GET() {
   await cleanupOldOrders();
 
   const sb = getSupabase();
-  const [invRes, ordRes, logRes, closedRes, openRes, messageRes, discordRes, webhookRes] =
+  const [invRes, ordRes, logRes, closedRes, openRes, messageRes, discordRes, webhookRes, backupWebhookRes] =
     await Promise.all([
       sb.from("inventory").select("*").order("id"),
       sb.from("orders").select("*").order("id"),
@@ -51,6 +51,11 @@ export async function GET() {
         .maybeSingle(),
       sb.from("settings").select("value").eq("key", "discord_link").maybeSingle(),
       sb.from("settings").select("value").eq("key", "discord_webhook_url").maybeSingle(),
+      sb
+        .from("settings")
+        .select("value")
+        .eq("key", "discord_backup_webhook_url")
+        .maybeSingle(),
     ]);
 
   const inventory = (invRes.data || []) as InventoryRow[];
@@ -80,6 +85,10 @@ export async function GET() {
       : "https://discord.gg/anAmr5MQF";
   const discordWebhookUrl =
     webhookRes.data && webhookRes.data.value ? webhookRes.data.value : "";
+  const discordBackupWebhookUrl =
+    backupWebhookRes.data && backupWebhookRes.data.value
+      ? backupWebhookRes.data.value
+      : "";
 
   return json({
     inventory,
@@ -88,6 +97,7 @@ export async function GET() {
     siteStatus: { closed, message: closedMessage },
     discordLink,
     discordWebhookUrl,
+    discordBackupWebhookUrl,
     role: session.role,
     user: session.user,
   });

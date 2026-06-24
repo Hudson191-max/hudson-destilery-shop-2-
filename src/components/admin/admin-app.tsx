@@ -569,6 +569,7 @@ export default function AdminApp() {
   const siteStatus = data?.siteStatus ?? { closed: false, message: "" };
   const discordLink = data?.discordLink ?? "https://discord.gg/anAmr5MQF";
   const discordWebhookUrl = data?.discordWebhookUrl ?? "";
+  const discordBackupWebhookUrl = data?.discordBackupWebhookUrl ?? "";
 
   const isOwner = role === "owner";
   const isCustomer = role === "customer";
@@ -942,11 +943,17 @@ export default function AdminApp() {
         open={discordOpen}
         currentUrl={discordLink}
         currentWebhookUrl={discordWebhookUrl}
+        currentBackupWebhookUrl={discordBackupWebhookUrl}
         onClose={() => setDiscordOpen(false)}
-        onSaved={(url, webhookUrl) => {
+        onSaved={(url, webhookUrl, backupWebhookUrl) => {
           setData((d) =>
             d
-              ? { ...d, discordLink: url, discordWebhookUrl: webhookUrl }
+              ? {
+                  ...d,
+                  discordLink: url,
+                  discordWebhookUrl: webhookUrl,
+                  discordBackupWebhookUrl: backupWebhookUrl,
+                }
               : d
           );
           try {

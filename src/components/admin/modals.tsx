@@ -783,27 +783,35 @@ interface DiscordProps {
   open: boolean;
   currentUrl: string;
   currentWebhookUrl: string;
+  currentBackupWebhookUrl: string;
   onClose: () => void;
-  onSaved: (url: string, webhookUrl: string) => void;
+  onSaved: (
+    url: string,
+    webhookUrl: string,
+    backupWebhookUrl: string
+  ) => void;
 }
 
 export function DiscordModal({
   open,
   currentUrl,
   currentWebhookUrl,
+  currentBackupWebhookUrl,
   onClose,
   onSaved,
 }: DiscordProps) {
   const [url, setUrl] = useState("");
   const [webhookUrl, setWebhookUrl] = useState("");
+  const [backupWebhookUrl, setBackupWebhookUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setUrl(currentUrl || "");
       setWebhookUrl(currentWebhookUrl || "");
+      setBackupWebhookUrl(currentBackupWebhookUrl || "");
     }
-  }, [open, currentUrl, currentWebhookUrl]);
+  }, [open, currentUrl, currentWebhookUrl, currentBackupWebhookUrl]);
 
   async function submit() {
     if (!url.trim()) {
@@ -814,9 +822,17 @@ export function DiscordModal({
     try {
       await api("/api/admin/discord", {
         method: "POST",
-        body: { url: url.trim(), webhookUrl: webhookUrl.trim() },
+        body: {
+          url: url.trim(),
+          webhookUrl: webhookUrl.trim(),
+          backupWebhookUrl: backupWebhookUrl.trim(),
+        },
       });
-      onSaved(url.trim(), webhookUrl.trim());
+      onSaved(
+        url.trim(),
+        webhookUrl.trim(),
+        backupWebhookUrl.trim()
+      );
       toast("Discord settings saved", "ok");
       onClose();
     } catch (e) {
@@ -860,7 +876,7 @@ export function DiscordModal({
         </div>
       </div>
       <div className="form-group" style={{ marginBottom: 16 }}>
-        <label>Staff webhook URL (private)</label>
+        <label>Order webhook URL <span style={{ color: "var(--text2)" }}>(private — #orders channel)</span></label>
         <input
           type="url"
           value={webhookUrl}
@@ -872,6 +888,25 @@ export function DiscordModal({
           Integrations → Webhooks → New Webhook → Copy URL.
           <br />
           When set, new orders auto-ping this channel. Leave empty to disable.
+        </div>
+      </div>
+      <div className="form-group" style={{ marginBottom: 16 }}>
+        <label>
+          Backup webhook URL{" "}
+          <span style={{ color: "var(--text2)" }}>
+            (optional — #backups channel)
+          </span>
+        </label>
+        <input
+          type="url"
+          value={backupWebhookUrl}
+          onChange={(e) => setBackupWebhookUrl(e.target.value)}
+          placeholder="https://discord.com/api/webhooks/..."
+        />
+        <div style={{ fontSize: 12, color: "var(--text2)", marginTop: 4 }}>
+          Used for the daily auto-backup file attachment. When empty, backups
+          fall back to the order webhook above — so set this only if you want
+          backups in a separate (e.g. muteable) channel.
         </div>
       </div>
     </Modal>

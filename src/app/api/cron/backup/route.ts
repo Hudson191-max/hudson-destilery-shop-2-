@@ -72,5 +72,6 @@ export async function GET(req: Request) {
     size: jsonContent.length,
     orders: backup.orders.length,
     inventory: backup.inventory.length,
+    usedFallbackWebhook: result.usedFallback,
   });
 }

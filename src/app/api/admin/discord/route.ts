@@ -1,13 +1,23 @@
 import { getSupabase } from "@/lib/supabase";
 import { json, errorJson, requireOwner } from "@/lib/api-helpers";
 
-// Saves both the public Discord invite link AND the staff webhook URL.
-// Both live in the settings table under separate keys.
+// Saves the public Discord invite link + the two staff webhook URLs:
+//   • webhookUrl        → real-time order pings
+//   • backupWebhookUrl  → daily backup file attachment (optional; falls back
+//                         to webhookUrl when empty)
+// All three live in the settings table under separate keys.
+const WEBHOOK_RE =
+  /^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\//i;
+
 export async function POST(req: Request) {
   const session = await requireOwner();
   if (!session) return errorJson("Unauthorized.", 401);
 
-  let body: { url?: string; webhookUrl?: string };
+  let body: {
+    url?: string;
+    webhookUrl?: string;
+    backupWebhookUrl?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -26,11 +36,30 @@ export async function POST(req: Request) {
   if (body.webhookUrl !== undefined) {
     const webhookUrl = (body.webhookUrl || "").trim();
     // Empty string = clear the webhook. Otherwise must be a valid Discord webhook URL.
-    if (webhookUrl && !/^https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\//i.test(webhookUrl)) {
-      return errorJson("Webhook URL must be a Discord webhook (https://discord.com/api/webhooks/...).", 400);
+    if (webhookUrl && !WEBHOOK_RE.test(webhookUrl)) {
+      return errorJson(
+        "Order webhook URL must be a Discord webhook (https://discord.com/api/webhooks/...).",
+        400
+      );
     }
     updates.push(
       sb.from("settings").upsert({ key: "discord_webhook_url", value: webhookUrl })
+    );
+  }
+
+  if (body.backupWebhookUrl !== undefined) {
+    const backupWebhookUrl = (body.backupWebhookUrl || "").trim();
+    // Empty string = clear (falls back to the orders webhook). Otherwise validate.
+    if (backupWebhookUrl && !WEBHOOK_RE.test(backupWebhookUrl)) {
+      return errorJson(
+        "Backup webhook URL must be a Discord webhook (https://discord.com/api/webhooks/...).",
+        400
+      );
+    }
+    updates.push(
+      sb
+        .from("settings")
+        .upsert({ key: "discord_backup_webhook_url", value: backupWebhookUrl })
     );
   }
 
@@ -49,5 +78,6 @@ export async function POST(req: Request) {
     ok: true,
     url: body.url,
     webhookUrl: body.webhookUrl,
+    backupWebhookUrl: body.backupWebhookUrl,
   });
 }
