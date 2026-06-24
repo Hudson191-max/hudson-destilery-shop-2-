@@ -1,7 +1,9 @@
 // Shared helpers for the admin panel — pure functions, no React.
+import { useMemo, useState } from "react";
 import {
   CURRENCY,
   LOGO_URL,
+  orderTotal,
   type InventoryRow,
   type OrderRow,
   type OrderLine,
@@ -231,3 +233,106 @@ export const SITE_STATUS_PRESETS: { label: string; message: string }[] = [
   { label: "Currently away", message: "We’re currently away. Orders will reopen soon!" },
   { label: "Not accepting orders", message: "We’re not accepting orders right now. Please check back again soon!" },
 ];
+
+// ── Order table sorting ─────────────────────────────────────────────────────
+// Click a sortable header → sort ascending. Click the same header again →
+// sort descending. Click a different header → switch column, default asc.
+
+export type OrderSortKey =
+  | "id"
+  | "customer"
+  | "items"
+  | "total"
+  | "status"
+  | "date";
+
+export type SortDirection = "asc" | "desc";
+
+export interface SortState {
+  key: OrderSortKey;
+  dir: SortDirection;
+}
+
+export const DEFAULT_ORDER_SORT: SortState = {
+  // Newest first by id desc = "show me the most recent orders at the top".
+  // Matches the pre-sorting behaviour (orders come back from the API
+  // ordered by id ascending, so flipping to desc surfaces the freshest
+  // orders on top).
+  key: "id",
+  dir: "desc",
+};
+
+// Compare two values of possibly-different types in a way that doesn't throw.
+function compareValues(a: unknown, b: unknown): number {
+  // Treat null/undefined/empty as "smallest" so they always sort to the
+  // bottom of an ascending list (no random ordering of empty rows).
+  const aEmpty = a == null || a === "";
+  const bEmpty = b == null || b === "";
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return -1;
+  if (bEmpty) return 1;
+
+  if (typeof a === "number" && typeof b === "number") {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  // Fall back to string comparison — works for customer names, statuses,
+  // ISO dates ("2026-06-24" sorts chronologically as a string), etc.
+  const sa = String(a);
+  const sb = String(b);
+  return sa < sb ? -1 : sa > sb ? 1 : 0;
+}
+
+function getOrderSortValue(o: AdminOrder, key: OrderSortKey): unknown {
+  switch (key) {
+    case "id":
+      return Number(o.id);
+    case "customer":
+      return (o.customer || "").toLowerCase();
+    case "items":
+      // Total item quantity — a stable proxy for "size" of order.
+      return o.parsedLines.reduce((s, l) => s + l.qty, 0);
+    case "total":
+      return o.total ?? orderTotal(o.parsedLines);
+    case "status":
+      return String(o.status || "").toLowerCase();
+    case "date":
+      // ISO date string — sorts chronologically as text.
+      return o.date || "";
+  }
+}
+
+export function sortOrders(
+  orders: AdminOrder[],
+  sort: SortState
+): AdminOrder[] {
+  const sorted = [...orders].sort((a, b) => {
+    const cmp = compareValues(
+      getOrderSortValue(a, sort.key),
+      getOrderSortValue(b, sort.key)
+    );
+    return sort.dir === "asc" ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+// Reusable hook that owns the sort state for one table.
+export function useOrderSort(initial: SortState = DEFAULT_ORDER_SORT) {
+  const [sort, setSort] = useState<SortState>(initial);
+  function toggle(key: OrderSortKey) {
+    setSort((cur) => {
+      if (cur.key !== key) return { key, dir: "asc" };
+      return { key, dir: cur.dir === "asc" ? "desc" : "asc" };
+    });
+  }
+  return { sort, toggle };
+}
+
+// Convenience: own sort state + a sorted, memoised view of the input list.
+export function useSortedOrders(
+  orders: AdminOrder[],
+  initial: SortState = DEFAULT_ORDER_SORT
+) {
+  const { sort, toggle } = useOrderSort(initial);
+  const sorted = useMemo(() => sortOrders(orders, sort), [orders, sort]);
+  return { sort, toggle, sorted };
+}

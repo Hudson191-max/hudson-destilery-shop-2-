@@ -1617,3 +1617,55 @@ main.hd-main {
   outline-offset: 2px;
 }
 
+/* ── Sortable table headers ─────────────────────────────────────────────── */
+/* Make the whole <th> clickable via an inner button. The faint ⇅ hint on
+   non-active columns signals "you can click here to sort". The active
+   column shows ↑ / ↓ and gets a subtle accent underline. */
+.th-sort {
+  padding: 0 !important;
+  vertical-align: middle;
+}
+.th-sort-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  color: var(--text2);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.th-sort-btn:hover,
+.th-sort-btn:focus-visible {
+  color: var(--text0);
+  background: var(--bg2);
+  outline: none;
+}
+.th-sort-active .th-sort-btn {
+  color: var(--accent);
+}
+.th-sort-active {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.th-sort-ind {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+/* Faint helper text shown next to a card title (e.g. "Sorted by date asc"). */
+.muted-hint {
+  color: var(--text2);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+

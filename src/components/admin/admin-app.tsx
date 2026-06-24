@@ -21,8 +21,11 @@ import {
   stockBarColor,
   stockBarPct,
   stockStatusKind,
+  useSortedOrders,
   type AdminData,
   type AdminOrder,
+  type OrderSortKey,
+  type SortState,
 } from "./admin-helpers";
 import {
   AddItemModal,
@@ -45,6 +48,57 @@ interface ConfettiPiece {
   delay: number;
   rotate: number;
   color: string;
+}
+
+// ── Sortable column header ───────────────────────────────────────────────────
+// A <th> that toggles sort direction when clicked. Shows a ↑ / ↓ indicator
+// when the column is active, and a faint ⇅ hint when it isn't (so users
+// discover that the headers are clickable).
+function SortHeader({
+  label,
+  column,
+  sort,
+  onToggle,
+  align,
+}: {
+  label: string;
+  column: OrderSortKey;
+  sort: SortState;
+  onToggle: (k: OrderSortKey) => void;
+  align?: "left" | "right" | "center";
+}) {
+  const active = sort.key === column;
+  const indicator = active ? (sort.dir === "asc" ? " ↑" : " ↓") : " ⇅";
+  return (
+    <th
+      scope="col"
+      style={{ textAlign: align || "left" }}
+      className={"th-sort" + (active ? " th-sort-active" : "")}
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        className="th-sort-btn"
+        onClick={() => onToggle(column)}
+        title={
+          active
+            ? sort.dir === "asc"
+              ? `Sorted ascending — click to reverse`
+              : `Sorted descending — click to reverse`
+            : `Click to sort by ${label}`
+        }
+      >
+        <span>{label}</span>
+        <span
+          className="th-sort-ind"
+          style={{ opacity: active ? 1 : 0.45 }}
+          aria-hidden="true"
+        >
+          {indicator.trim()}
+        </span>
+      </button>
+    </th>
+  );
 }
 
 export default function AdminApp() {
@@ -1090,6 +1144,18 @@ function DashboardPage({
   const deliveryOrders = orders.filter(
     (o) => o.status === "Ready for Delivery"
   );
+  // Each table owns its own sort state. Active orders default to newest
+  // first (id desc) so staff see fresh orders at the top. Delivery queue
+  // defaults to oldest first (id asc) so the longest-waiting delivery
+  // surfaces at the top — that's the one staff most need to act on.
+  const activeSort = useSortedOrders(active, {
+    key: "id",
+    dir: "desc",
+  });
+  const deliverySort = useSortedOrders(deliveryOrders, {
+    key: "id",
+    dir: "asc",
+  });
   const revenue = orders
     .filter((o) => o.status === "Done")
     .reduce((s, o) => s + (o.total ?? orderTotal(o.parsedLines)), 0);
@@ -1146,28 +1212,33 @@ function DashboardPage({
       <div className="card">
         <div className="card-head">
           <div className="card-title">Delivery queue</div>
+          {deliveryOrders.length > 0 ? (
+            <span className="muted-hint">
+              Sorted by {deliverySort.sort.key} {deliverySort.sort.dir} — click a column to change
+            </span>
+          ) : null}
         </div>
         <div className="tbl-wrap">
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Customer</th>
-                <th>Items</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Date</th>
+                <SortHeader label="#" column="id" sort={deliverySort.sort} onToggle={deliverySort.toggle} />
+                <SortHeader label="Customer" column="customer" sort={deliverySort.sort} onToggle={deliverySort.toggle} />
+                <SortHeader label="Items" column="items" sort={deliverySort.sort} onToggle={deliverySort.toggle} />
+                <SortHeader label="Total" column="total" sort={deliverySort.sort} onToggle={deliverySort.toggle} align="right" />
+                <SortHeader label="Status" column="status" sort={deliverySort.sort} onToggle={deliverySort.toggle} />
+                <SortHeader label="Date" column="date" sort={deliverySort.sort} onToggle={deliverySort.toggle} />
               </tr>
             </thead>
             <tbody>
-              {deliveryOrders.length === 0 ? (
+              {deliverySort.sorted.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty">
                     NO ORDERS READY FOR DELIVERY
                   </td>
                 </tr>
               ) : (
-                deliveryOrders.map((o) => (
+                deliverySort.sorted.map((o) => (
                   <tr key={o.id}>
                     <td className="td-mono">#{o.id}</td>
                     <td className="td-name">{o.customer}</td>
@@ -1207,29 +1278,34 @@ function DashboardPage({
       <div className="card">
         <div className="card-head">
           <div className="card-title">Active orders</div>
+          {active.length > 0 ? (
+            <span className="muted-hint">
+              Sorted by {activeSort.sort.key} {activeSort.sort.dir} — click a column to change
+            </span>
+          ) : null}
         </div>
         <div className="tbl-wrap">
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Customer</th>
-                <th>Items</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Date</th>
+                <SortHeader label="#" column="id" sort={activeSort.sort} onToggle={activeSort.toggle} />
+                <SortHeader label="Customer" column="customer" sort={activeSort.sort} onToggle={activeSort.toggle} />
+                <SortHeader label="Items" column="items" sort={activeSort.sort} onToggle={activeSort.toggle} />
+                <SortHeader label="Total" column="total" sort={activeSort.sort} onToggle={activeSort.toggle} align="right" />
+                <SortHeader label="Status" column="status" sort={activeSort.sort} onToggle={activeSort.toggle} />
+                <SortHeader label="Date" column="date" sort={activeSort.sort} onToggle={activeSort.toggle} />
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {active.length === 0 ? (
+              {activeSort.sorted.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="empty">
                     NO ACTIVE ORDERS
                   </td>
                 </tr>
               ) : (
-                active.map((o) => {
+                activeSort.sorted.map((o) => {
                   const status = String(o.status);
                   return (
                     <tr key={o.id}>
@@ -1937,33 +2013,48 @@ function HistoryPage({ orders }: { orders: AdminOrder[] }) {
   const done = orders.filter(
     (o) => o.status === "Done" || o.status === "Cancelled"
   );
+  // History defaults to newest first (id desc) — most recent completed
+  // orders at the top, so staff can review what was just finished.
+  const { sort, toggle, sorted } = useSortedOrders(done, {
+    key: "id",
+    dir: "desc",
+  });
   return (
     <div>
       <div className="section-head">
         <div className="section-title">Order history</div>
       </div>
       <div className="card">
+        <div className="card-head">
+          {done.length > 0 ? (
+            <span className="muted-hint">
+              Sorted by {sort.key} {sort.dir} — click a column to change
+            </span>
+          ) : (
+            <span />
+          )}
+        </div>
         <div className="tbl-wrap">
           <table>
             <thead>
               <tr>
-                <th>#</th>
-                <th>Customer</th>
-                <th>Items</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Date</th>
+                <SortHeader label="#" column="id" sort={sort} onToggle={toggle} />
+                <SortHeader label="Customer" column="customer" sort={sort} onToggle={toggle} />
+                <SortHeader label="Items" column="items" sort={sort} onToggle={toggle} />
+                <SortHeader label="Total" column="total" sort={sort} onToggle={toggle} align="right" />
+                <SortHeader label="Status" column="status" sort={sort} onToggle={toggle} />
+                <SortHeader label="Date" column="date" sort={sort} onToggle={toggle} />
               </tr>
             </thead>
             <tbody>
-              {done.length === 0 ? (
+              {sorted.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty">
                     NO HISTORY
                   </td>
                 </tr>
               ) : (
-                done.map((o) => (
+                sorted.map((o) => (
                   <tr key={o.id}>
                     <td className="td-mono">#{o.id}</td>
                     <td className="td-name">{o.customer}</td>
