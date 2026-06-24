@@ -51,6 +51,7 @@ export async function PATCH(req: Request) {
     price?: number;
     stock?: number;
     cat?: string;
+    active?: boolean;
   };
   try {
     body = await req.json();
@@ -63,7 +64,7 @@ export async function PATCH(req: Request) {
   const sb = getSupabase();
   const cur = await sb
     .from("inventory")
-    .select("id, name, price, stock, cat")
+    .select("id, name, price, stock, cat, active")
     .eq("id", id)
     .maybeSingle();
   if (cur.error || !cur.data) return errorJson("Item not found.", 404);
@@ -73,6 +74,7 @@ export async function PATCH(req: Request) {
     price: number;
     stock: number;
     cat: string;
+    active: boolean | null;
   };
 
   const name = (body.name || "").trim() || existing.name;
@@ -83,10 +85,14 @@ export async function PATCH(req: Request) {
     : existing.cat;
   const diff = stock - existing.stock;
 
-  const upd = await sb
-    .from("inventory")
-    .update({ name, price, stock, cat })
-    .eq("id", id);
+  // Only touch `active` when the caller explicitly sent it. This keeps the
+  // PATCH backward compatible with callers that don't know about the flag.
+  const patch: Record<string, unknown> = { name, price, stock, cat };
+  if (body.active === true || body.active === false) {
+    patch.active = body.active;
+  }
+
+  const upd = await sb.from("inventory").update(patch).eq("id", id);
   if (upd.error) return errorJson("Could not update item.", 500);
 
   await sb.from("stock_log").insert({

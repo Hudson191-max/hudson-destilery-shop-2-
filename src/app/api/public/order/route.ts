@@ -73,10 +73,13 @@ export async function POST(req: Request) {
   if (closed) return errorJson("Orders are currently closed.", 400);
 
   // Resolve item names/prices server-side (never trust client prices).
+  // Items toggled off (`active = false`) are treated as unavailable — the
+  // public inventory list omits them, so a stale client page that still
+  // shows them must be rejected here to prevent ordering hidden stock.
   const ids = Array.from(new Set(cleanItems.map((i) => i.itemId)));
   const invRes = await sb
     .from("inventory")
-    .select("id, name, price")
+    .select("id, name, price, active")
     .in("id", ids);
   if (invRes.error || !invRes.data)
     return errorJson("Could not load inventory.", 500);
@@ -84,13 +87,24 @@ export async function POST(req: Request) {
   const invMap = new Map(invRes.data.map((i) => [String(i.id), i]));
   const lines: OrderLine[] = [];
   let total = 0;
+  let hiddenCount = 0;
   for (const it of cleanItems) {
     const inv = invMap.get(String(it.itemId));
     if (!inv) continue;
+    const active = (inv as { active?: boolean | null }).active;
+    const isActive = active === null || active === undefined || active === true;
+    if (!isActive) {
+      hiddenCount += it.qty;
+      continue;
+    }
     lines.push({ itemId: inv.id, name: inv.name, qty: it.qty, price: inv.price });
     total += it.qty * inv.price;
   }
-  if (!lines.length) return errorJson("Selected items are unavailable.", 400);
+  if (hiddenCount > 0 && !lines.length)
+    return errorJson(
+      "Some selected items are no longer available for sale.",
+      400
+    );
   if (total > MAX_ORDER_TOTAL)
     return errorJson(
       `That order exceeds the maximum allowed total of ${MAX_ORDER_TOTAL.toLocaleString()} R.`,

@@ -47,7 +47,10 @@ CREATE TABLE inventory (
   name  TEXT NOT NULL,
   price INTEGER NOT NULL DEFAULT 0,
   stock INTEGER NOT NULL DEFAULT 0,
-  cat   TEXT  NOT NULL DEFAULT 'Other'
+  cat   TEXT  NOT NULL DEFAULT 'Other',
+  -- When false, the item is hidden from the public order page and cannot be
+  -- ordered. Defaults to TRUE for backward compatibility with old rows.
+  active BOOLEAN NOT NULL DEFAULT TRUE
 );
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public read inventory" ON inventory FOR SELECT USING (true);

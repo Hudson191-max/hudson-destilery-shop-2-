@@ -368,6 +368,27 @@ export default function AdminApp() {
     }
   }
 
+  // ── Inventory toggle on/off sale (owner) ────────────────────────────────
+  const toggleActive = useCallback(
+    async (item: InventoryRow, nextActive: boolean) => {
+      try {
+        await api("/api/admin/inventory/toggle", {
+          method: "POST",
+          body: { id: item.id, active: nextActive },
+        });
+        toast(
+          `${item.name} is now ${nextActive ? "for sale" : "hidden"}`,
+          "ok"
+        );
+        await loadData(false);
+      } catch (e) {
+        const err = e as ApiError;
+        toast("Toggle failed", "err", err.detail || err.message);
+      }
+    },
+    [loadData]
+  );
+
   // ── Export / import / reset (owner) ─────────────────────────────────────
   async function exportData() {
     try {
@@ -786,6 +807,11 @@ export default function AdminApp() {
                 setEditItemOpen(true);
               }}
               onDelete={(item) => void deleteItem(item)}
+              onToggleActive={
+                isOwner
+                  ? (item, next) => void toggleActive(item, next)
+                  : undefined
+              }
             />
           ) : null}
           {page === "needed" ? (
@@ -1305,6 +1331,7 @@ function InventoryPage({
   onQuickRestock,
   onEdit,
   onDelete,
+  onToggleActive,
 }: {
   inventory: InventoryRow[];
   isOwner: boolean;
@@ -1313,7 +1340,12 @@ function InventoryPage({
   onQuickRestock: (id: number | string) => void;
   onEdit: (i: InventoryRow) => void;
   onDelete: (i: InventoryRow) => void;
+  onToggleActive?: (i: InventoryRow, nextActive: boolean) => void;
 }) {
+  // An item is considered "for sale" unless `active` is explicitly false.
+  // (Older rows created before the column existed report undefined/null.)
+  const isForSale = (i: InventoryRow) => i.active !== false;
+
   return (
     <div>
       <div className="section-head">
@@ -1340,25 +1372,44 @@ function InventoryPage({
                 <th>Price ({CURRENCY})</th>
                 <th>Stock</th>
                 <th>Status</th>
+                <th>For sale</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {inventory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="empty">
+                  <td colSpan={8} className="empty">
                     NO ITEMS
                   </td>
                 </tr>
               ) : (
                 inventory.map((i) => {
                   const kind = stockStatusKind(i.stock);
+                  const forSale = isForSale(i);
                   return (
-                    <tr key={i.id}>
+                    <tr
+                      key={i.id}
+                      style={
+                        forSale
+                          ? undefined
+                          : { opacity: 0.55, background: "var(--bg2)" }
+                      }
+                    >
                       <td className="td-mono" style={{ color: "var(--text2)" }}>
                         {i.id}
                       </td>
-                      <td className="td-name">{i.name}</td>
+                      <td className="td-name">
+                        {i.name}
+                        {!forSale ? (
+                          <span
+                            className="badge badge-out"
+                            style={{ marginLeft: 8, fontSize: 10 }}
+                          >
+                            HIDDEN
+                          </span>
+                        ) : null}
+                      </td>
                       <td style={{ color: "var(--text2)", fontSize: 12 }}>
                         {i.cat}
                       </td>
@@ -1389,6 +1440,37 @@ function InventoryPage({
                               ? "Low"
                               : "OK"}
                         </span>
+                      </td>
+                      <td>
+                        {onToggleActive ? (
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={forSale}
+                            aria-label={
+                              forSale
+                                ? `Hide ${i.name} from public order page`
+                                : `Show ${i.name} on public order page`
+                            }
+                            title={
+                              forSale
+                                ? "Click to hide from customers"
+                                : "Click to make available for sale"
+                            }
+                            onClick={() => onToggleActive(i, !forSale)}
+                            className="sale-toggle"
+                            data-on={forSale ? "true" : "false"}
+                          >
+                            <span className="sale-toggle-knob" />
+                            <span className="sale-toggle-label">
+                              {forSale ? "On" : "Off"}
+                            </span>
+                          </button>
+                        ) : forSale ? (
+                          <span className="badge badge-ok">Yes</span>
+                        ) : (
+                          <span className="badge badge-out">No</span>
+                        )}
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 4 }}>

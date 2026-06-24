@@ -37,6 +37,9 @@ export interface InventoryRow {
   price: number;
   stock: number;
   cat: string;
+  // Whether the item is visible/purchasable on the public order page.
+  // Older rows without the column will report undefined → treat as active.
+  active?: boolean | null;
 }
 
 export interface StockLogRow {

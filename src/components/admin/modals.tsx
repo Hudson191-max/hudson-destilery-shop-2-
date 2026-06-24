@@ -392,6 +392,8 @@ export function EditItemModal({ open, item, onClose, onDone }: EditItemProps) {
   const [price, setPrice] = useState<number | "">("");
   const [stock, setStock] = useState<number | "">("");
   const [cat, setCat] = useState<string>("Other");
+  // Default to "for sale" when an older item has no `active` value yet.
+  const [active, setActive] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -400,6 +402,7 @@ export function EditItemModal({ open, item, onClose, onDone }: EditItemProps) {
       setPrice(item.price);
       setStock(item.stock);
       setCat(item.cat);
+      setActive(item.active !== false);
     }
   }, [open, item]);
 
@@ -415,6 +418,7 @@ export function EditItemModal({ open, item, onClose, onDone }: EditItemProps) {
           price: Number(price) || item.price,
           stock: Math.max(0, Number(stock) || 0),
           cat,
+          active,
         },
       });
       toast(`${name.trim() || item.name} inventory item updated`, "ok");
@@ -490,6 +494,38 @@ export function EditItemModal({ open, item, onClose, onDone }: EditItemProps) {
             ))}
           </select>
         </div>
+      </div>
+      <div className="form-group" style={{ marginTop: 12 }}>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            style={{ width: 16, height: 16, cursor: "pointer" }}
+          />
+          <span>
+            Available for sale
+            <span
+              style={{
+                display: "block",
+                color: "var(--text2)",
+                fontSize: 12,
+                marginTop: 2,
+              }}
+            >
+              When off, this item is hidden from the public order page and
+              cannot be ordered.
+            </span>
+          </span>
+        </label>
       </div>
     </Modal>
   );
