@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { ToastHost } from "@/components/toast-host";
 
@@ -35,6 +36,10 @@ export default function RootLayout({
       <body className="hd-root antialiased">
         {children}
         <ToastHost />
+        {/* Vercel Speed Insights — collects Core Web Vitals (LCP, FID, CLS)
+            from real users and surfaces them in the Vercel dashboard.
+            No-op in dev; only active on Vercel deployments. */}
+        <SpeedInsights />
       </body>
     </html>
   );
