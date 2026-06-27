@@ -1669,3 +1669,186 @@ main.hd-main {
   font-weight: 500;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Payroll page — restock summary per employee
+   ═══════════════════════════════════════════════════════════════════════════ */
+.payroll-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.payroll-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+.payroll-filter-group label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+  font-weight: 600;
+}
+.payroll-filter-group input {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 38px;
+}
+.payroll-filter-group input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.payroll-rate {
+  min-width: 160px;
+}
+.payroll-quick-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.btn-sm {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  min-height: 32px;
+}
+.payroll-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.payroll-stat {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.payroll-stat-num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  font-family: "Share Tech Mono", monospace;
+  line-height: 1.2;
+}
+.payroll-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+  margin-top: 4px;
+}
+.payroll-table .th-num {
+  text-align: right;
+}
+.payroll-table .td-num {
+  text-align: right;
+}
+.payroll-table .td-units {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+}
+.payroll-table .td-payout {
+  color: var(--accent);
+  font-weight: 700;
+}
+.payroll-table .td-items-count {
+  color: var(--text2);
+  font-size: 12px;
+  text-align: right;
+}
+.payroll-row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.payroll-row:hover {
+  background: var(--bg2);
+}
+.payroll-row.expanded {
+  background: var(--bg2);
+}
+.payroll-caret {
+  display: inline-block;
+  width: 16px;
+  color: var(--text2);
+  font-size: 12px;
+  margin-right: 6px;
+}
+.payroll-detail-row td {
+  padding: 0 !important;
+  background: var(--bg2);
+  border-top: 1px dashed var(--border) !important;
+}
+.payroll-items {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px 12px 32px;
+}
+.payroll-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  align-items: center;
+}
+.payroll-item:last-child {
+  border-bottom: none;
+}
+.payroll-item-name {
+  color: var(--text);
+  font-weight: 500;
+}
+.payroll-item-qty {
+  font-family: "Share Tech Mono", monospace;
+  color: var(--text);
+  white-space: nowrap;
+}
+.payroll-item-qty .muted {
+  color: var(--text2);
+  font-size: 11px;
+}
+.payroll-item-pay {
+  font-family: "Share Tech Mono", monospace;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 80px;
+  text-align: right;
+}
+.payroll-table tfoot td {
+  border-top: 2px solid var(--border);
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+@media (max-width: 600px) {
+  .payroll-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .payroll-filter-group {
+    min-width: 0;
+  }
+  .payroll-quick-buttons {
+    justify-content: flex-start;
+  }
+  .payroll-item {
+    grid-template-columns: 1fr auto;
+  }
+  .payroll-item-pay {
+    grid-column: 1 / -1;
+    text-align: left;
+    padding-left: 12px;
+  }
+}
