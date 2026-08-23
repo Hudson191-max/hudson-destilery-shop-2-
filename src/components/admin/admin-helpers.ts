@@ -97,7 +97,7 @@ export function buildOrderReceiptMarkup(o: {
       (l) =>
         `<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #ddd;font-size:13px"><span>${escapeHtml(
           l.name
-        )} ×${l.qty}</span><span>R${(l.qty * l.price).toLocaleString()}</span></div>`
+        )} ×${l.qty}</span><span>$${(l.qty * l.price).toLocaleString()}</span></div>`
     )
     .join("");
 
@@ -120,7 +120,7 @@ export function buildOrderReceiptMarkup(o: {
       o.contact || "—"
     )}</span></div>` +
     itemRows +
-    `<div style="font-size:16px;font-weight:700;padding-top:10px;margin-top:6px;border-top:2px solid #000;display:flex;justify-content:space-between;gap:12px"><span>Total</span><span>R${total.toLocaleString()}</span></div>` +
+    `<div style="font-size:16px;font-weight:700;padding-top:10px;margin-top:6px;border-top:2px solid #000;display:flex;justify-content:space-between;gap:12px"><span>Total</span><span>$${total.toLocaleString()}</span></div>` +
     `<div style="margin-top:16px;font-size:12px;color:#444;line-height:1.6">Thanks for ordering with us. Keep this receipt or share it in Discord if you need help with your order.</div>` +
     `</div>`
   );
@@ -155,7 +155,7 @@ export function buildOrderDiscordText(o: {
     `Customer: ${o.customer || "—"}\n` +
     `Contact: ${o.contact || "—"}\n` +
     `Items: ${lines.map((l) => l.name + " x" + l.qty).join(", ")}\n` +
-    `Total: ${total.toLocaleString()} R`
+    `Total: $${total.toLocaleString()}`
   );
 }
 
@@ -195,7 +195,7 @@ export function buildOrderSlipText(o: {
       .map((l) => `• ${l.name} ×${l.qty} — ${(l.qty * l.price).toLocaleString()} R`)
       .join("\n") +
     `\n\n` +
-    `💰 **Total: ${total.toLocaleString()} R**\n` +
+    `💰 **Total: $${total.toLocaleString()}**\n` +
     `🎮 **Steam ID: 76561199401090066**`
   );
 }

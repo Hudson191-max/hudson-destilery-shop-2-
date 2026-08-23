@@ -1215,7 +1215,7 @@ function DashboardPage({
         <div className="metric metric-green">
           <div className="metric-label">Revenue</div>
           <div className="metric-value">{revenueDisplay}</div>
-          <div className="metric-sub">Roubles</div>
+          <div className="metric-sub">Dollars</div>
         </div>
         <div className="metric metric-red">
           <div className="metric-label">Low stock</div>

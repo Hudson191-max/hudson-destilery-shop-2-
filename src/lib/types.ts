@@ -69,7 +69,7 @@ export interface PublicOrder {
 export const MAX_ORDER_TOTAL = 2_000_000;
 export const MAX_ITEMS_PER_ORDER = 1000;
 
-export const CURRENCY = "R";
+export const CURRENCY = "$";
 
 export const LOGO_URL =
   "https://i.postimg.cc/0jB6HtW2/Chat-GPT-Image-25-mei-2026-11-35-47.png";
