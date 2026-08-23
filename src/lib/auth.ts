@@ -87,15 +87,20 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
-async function verifyPassword(username: string, pw: string): Promise<boolean> {
+async function verifyPassword(
+  username: string,
+  role: Exclude<Role, "customer">,
+  pw: string
+): Promise<boolean> {
   const sb = getSupabase();
   const res = await sb
     .from("auth")
-    .select("password_hash, salt")
+    .select("role, password_hash, salt")
     .eq("username", username)
     .maybeSingle();
   // SECURITY: no logging of hash/salt/match results anywhere.
   if (res.error || !res.data) return false;
+  if (String(res.data.role) !== role) return false;
   const stored = String(res.data.password_hash || "");
   const salt = String(res.data.salt || "");
   const hash = await sha256Hex(salt + pw + salt);
@@ -178,9 +183,7 @@ export async function attemptLogin(
     return { user: "Customer", role: "customer", iat: Date.now() };
   }
   if (!name || !pw) return null;
-  const allowed = await isNameWhitelisted(role, name);
-  if (!allowed) return null;
-  const ok = await verifyPassword(normalize(name), pw);
+  const ok = await verifyPassword(normalize(name), role, pw);
   if (!ok) return null;
   return { user: name, role, iat: Date.now() };
 }
