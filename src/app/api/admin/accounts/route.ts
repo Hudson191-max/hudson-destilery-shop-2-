@@ -76,3 +76,25 @@ export async function DELETE(req: Request) {
   if (res.error) return errorJson("Could not delete account.", 500);
   return json({ ok: true });
 }
+
+export async function PATCH(req: Request) {
+  if (!(await requireOwner())) return errorJson("Unauthorized.", 401);
+  let body: { username?: string; password?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return errorJson("Invalid request body.", 400);
+  }
+  const username = normalizeUsername(body.username || "");
+  const password = body.password || "";
+  if (!username) return errorJson("Username is required.", 400);
+  if (password.length < 8) return errorJson("Password must be at least 8 characters.", 400);
+
+  const salt = randomBytes(16).toString("hex");
+  const res = await getSupabase()
+    .from("auth")
+    .update({ password_hash: hashPassword(salt, password), salt })
+    .eq("username", username);
+  if (res.error) return errorJson("Could not reset password.", 500);
+  return json({ ok: true });
+}
