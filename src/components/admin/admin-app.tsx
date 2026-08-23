@@ -29,6 +29,7 @@ import {
 } from "./admin-helpers";
 import {
   AddItemModal,
+  AccountModal,
   DiscordModal,
   EditItemModal,
   NewOrderModal,
@@ -129,6 +130,7 @@ export default function AdminApp() {
   const [siteStatusOpen, setSiteStatusOpen] = useState(false);
   const [discordOpen, setDiscordOpen] = useState(false);
   const [whitelistOpen, setWhitelistOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [orderDetailOpen, setOrderDetailOpen] = useState(false);
   const [orderDetailTargetId, setOrderDetailTargetId] = useState<number | string | null>(null);
 
@@ -790,6 +792,12 @@ export default function AdminApp() {
                 >
                   🔐 Whitelist
                 </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setAccountOpen(true)}
+                >
+                  👤 Accounts
+                </button>
                 <button className="btn btn-sm btn-red" onClick={() => void resetData()}>
                   🗑 Reset
                 </button>
@@ -983,6 +991,7 @@ export default function AdminApp() {
         }}
       />
       <WhitelistModal open={whitelistOpen} onClose={() => setWhitelistOpen(false)} />
+      <AccountModal open={accountOpen} onClose={() => setAccountOpen(false)} />
       <OrderDetailModal
         open={orderDetailOpen}
         order={

@@ -121,12 +121,14 @@ export interface Database {
       };
       auth: {
         Row: {
+          username: string;
           role: string;
           password_hash: string;
           salt: string;
         };
-        Insert: { role: string; password_hash: string; salt: string };
+        Insert: { username: string; role: string; password_hash: string; salt: string };
         Update: {
+          username?: string;
           role?: string;
           password_hash?: string;
           salt?: string;

@@ -80,7 +80,8 @@ CREATE POLICY "server insert stock log" ON stock_log FOR INSERT WITH CHECK (true
 
 -- ── auth ─────────────────────────────────────────────────────────────────
 CREATE TABLE auth (
-  role          TEXT PRIMARY KEY,
+  username      TEXT PRIMARY KEY,
+  role          TEXT NOT NULL CHECK (role IN ('employee', 'owner')),
   password_hash TEXT NOT NULL,
   salt          TEXT NOT NULL
 );
@@ -111,9 +112,9 @@ INSERT INTO settings (key, value) VALUES
 -- ── Seed: auth (salted SHA-256, scheme = sha256(salt + pw + salt)) ───────
 --   owner   pw = hudson123  →  b51b0c27e5691b8804f0912014c0b01b433d444434209d0a3eaf4f3bd471c9e5
 --   employee pw = staff123  →  a3a9da851e6ecba8fe647bbba8c6e5671c3d628630556ba2aa3df75c6abbd81f
-INSERT INTO auth (role, password_hash, salt) VALUES
-  ('owner',    'b51b0c27e5691b8804f0912014c0b01b433d444434209d0a3eaf4f3bd471c9e5', 'hdsalt2026'),
-  ('employee', 'a3a9da851e6ecba8fe647bbba8c6e5671c3d628630556ba2aa3df75c6abbd81f', 'hdsalt2026');
+INSERT INTO auth (username, role, password_hash, salt) VALUES
+  ('hudson', 'owner', 'b51b0c27e5691b8804f0912014c0b01b433d444434209d0a3eaf4f3bd471c9e5', 'hdsalt2026'),
+  ('maria', 'employee', 'a3a9da851e6ecba8fe647bbba8c6e5671c3d628630556ba2aa3df75c6abbd81f', 'hdsalt2026');
 
 -- Done. The site at / (admin) and ?view=order (public order page) will now
 -- work end to end against this database.
