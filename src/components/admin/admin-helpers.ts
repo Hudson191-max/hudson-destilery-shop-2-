@@ -20,7 +20,7 @@ export interface AdminData {
   inventory: InventoryRow[];
   orders: AdminOrder[];
   stockLog: StockLogRow[];
-  siteStatus: { closed: boolean; message: string };
+  siteStatus: { closed: boolean; maintenance: boolean; message: string };
   discordLink: string;
   discordWebhookUrl: string;
   discordBackupWebhookUrl: string;

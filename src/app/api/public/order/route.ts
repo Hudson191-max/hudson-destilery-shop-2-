@@ -63,14 +63,27 @@ export async function POST(req: Request) {
 
   // Verify the site is open before accepting.
   const sb = getSupabase();
-  const closedRes = await sb
+  const [closedRes, maintenanceRes] = await Promise.all([
+    sb
     .from("settings")
     .select("value")
     .eq("key", "site_closed")
-    .maybeSingle();
+    .maybeSingle(),
+    sb
+      .from("settings")
+      .select("value")
+      .eq("key", "maintenance_mode")
+      .maybeSingle(),
+  ]);
   const closed =
     closedRes.data && String(closedRes.data.value).toLowerCase() === "true";
   if (closed) return errorJson("Orders are currently closed.", 400);
+  if (
+    maintenanceRes.data &&
+    String(maintenanceRes.data.value).toLowerCase() === "true"
+  ) {
+    return errorJson("The order site is temporarily offline for maintenance.", 503);
+  }
 
   // Resolve item names/prices server-side (never trust client prices).
   // Items toggled off (`active = false`) are treated as unavailable — the

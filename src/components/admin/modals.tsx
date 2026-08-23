@@ -663,25 +663,29 @@ export function RestockModal({
 interface SiteStatusProps {
   open: boolean;
   closed: boolean;
+  maintenance: boolean;
   message: string;
   onClose: () => void;
-  onSaved: (closed: boolean, message: string) => void;
+  onSaved: (closed: boolean, maintenance: boolean, message: string) => void;
 }
 
 export function SiteStatusModal({
   open,
   closed,
+  maintenance,
   message,
   onClose,
   onSaved,
 }: SiteStatusProps) {
   const [statusValue, setStatusValue] = useState<"open" | "closed">("open");
+  const [maintenanceValue, setMaintenanceValue] = useState(false);
   const [msg, setMsg] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (open) {
       setStatusValue(closed ? "closed" : "open");
+      setMaintenanceValue(maintenance);
       setMsg(message || DEFAULT_CLOSED_MESSAGE);
     }
   }, [open, closed, message]);
@@ -689,17 +693,18 @@ export function SiteStatusModal({
   async function submit() {
     setSubmitting(true);
     try {
-      const res = await api<{ closed: boolean; message: string }>(
+      const res = await api<{ closed: boolean; maintenance: boolean; message: string }>(
         "/api/admin/site-status",
         {
           method: "POST",
           body: {
             closed: statusValue === "closed",
+            maintenance: maintenanceValue,
             message: msg.trim() || DEFAULT_CLOSED_MESSAGE,
           },
         }
       );
-      onSaved(res.closed, res.message);
+      onSaved(res.closed, res.maintenance, res.message);
       toast(
         res.closed
           ? "Order site closed for customers"
@@ -746,6 +751,20 @@ export function SiteStatusModal({
           <option value="open">Open for orders</option>
           <option value="closed">Closed for orders</option>
         </select>
+      </div>
+      <div className="form-group" style={{ marginBottom: 12 }}>
+        <label>Maintenance mode</label>
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={maintenanceValue}
+            onChange={(e) => setMaintenanceValue(e.target.checked)}
+          />
+          Pause the public menu and new orders
+        </label>
+        <small style={{ display: "block", marginTop: 6 }}>
+          The owner panel stays available. Existing customers can still track or cancel orders.
+        </small>
       </div>
       <div className="form-group" style={{ marginBottom: 12 }}>
         <label>Quick presets</label>

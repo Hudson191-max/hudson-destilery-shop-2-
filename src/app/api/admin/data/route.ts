@@ -33,7 +33,7 @@ export async function GET() {
   await cleanupOldOrders();
 
   const sb = getSupabase();
-  const [invRes, ordRes, logRes, closedRes, openRes, messageRes, discordRes, webhookRes, backupWebhookRes] =
+  const [invRes, ordRes, logRes, closedRes, openRes, maintenanceRes, messageRes, discordRes, webhookRes, backupWebhookRes] =
     await Promise.all([
       sb.from("inventory").select("*").order("id"),
       sb.from("orders").select("*").order("id"),
@@ -44,6 +44,11 @@ export async function GET() {
         .limit(200),
       sb.from("settings").select("value").eq("key", "site_closed").maybeSingle(),
       sb.from("settings").select("value").eq("key", "site_open").maybeSingle(),
+      sb
+        .from("settings")
+        .select("value")
+        .eq("key", "maintenance_mode")
+        .maybeSingle(),
       sb
         .from("settings")
         .select("value")
@@ -79,6 +84,9 @@ export async function GET() {
     messageRes.data && messageRes.data.value
       ? messageRes.data.value
       : "Orders are temporarily paused. Please check back soon.";
+  const maintenance =
+    maintenanceRes.data &&
+    String(maintenanceRes.data.value).toLowerCase() === "true";
   const discordLink =
     discordRes.data && discordRes.data.value
       ? discordRes.data.value
@@ -94,7 +102,7 @@ export async function GET() {
     inventory,
     orders: ordersWithTotals,
     stockLog,
-    siteStatus: { closed, message: closedMessage },
+    siteStatus: { closed, maintenance, message: closedMessage },
     discordLink,
     discordWebhookUrl,
     discordBackupWebhookUrl,

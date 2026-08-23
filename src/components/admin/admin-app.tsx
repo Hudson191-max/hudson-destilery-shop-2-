@@ -566,7 +566,8 @@ export default function AdminApp() {
   const inventory = data?.inventory ?? [];
   const orders = data?.orders ?? [];
   const stockLog = data?.stockLog ?? [];
-  const siteStatus = data?.siteStatus ?? { closed: false, message: "" };
+  const siteStatus =
+    data?.siteStatus ?? { closed: false, maintenance: false, message: "" };
   const discordLink = data?.discordLink ?? "https://discord.gg/anAmr5MQF";
   const discordWebhookUrl = data?.discordWebhookUrl ?? "";
   const discordBackupWebhookUrl = data?.discordBackupWebhookUrl ?? "";
@@ -726,11 +727,16 @@ export default function AdminApp() {
               <>
                 <button
                   className={
-                    "btn btn-sm" + (siteStatus.closed ? " btn-red" : "")
+                    "btn btn-sm" +
+                    (siteStatus.maintenance || siteStatus.closed ? " btn-red" : "")
                   }
                   onClick={() => setSiteStatusOpen(true)}
                 >
-                  {siteStatus.closed ? "🛑 Orders Closed" : "🟢 Orders Open"}
+                  {siteStatus.maintenance
+                    ? "🔧 Maintenance Mode"
+                    : siteStatus.closed
+                      ? "🛑 Orders Closed"
+                      : "🟢 Orders Open"}
                 </button>
                 <button
                   className="btn btn-sm"
@@ -937,11 +943,12 @@ export default function AdminApp() {
       <SiteStatusModal
         open={siteStatusOpen}
         closed={siteStatus.closed}
+        maintenance={siteStatus.maintenance}
         message={siteStatus.message}
         onClose={() => setSiteStatusOpen(false)}
-        onSaved={(closed, message) => {
+        onSaved={(closed, maintenance, message) => {
           setData((d) =>
-            d ? { ...d, siteStatus: { closed, message } } : d
+            d ? { ...d, siteStatus: { closed, maintenance, message } } : d
           );
         }}
       />

@@ -6,6 +6,17 @@ import { json } from "@/lib/api-helpers";
 // are hidden from the customer-facing order page.
 export async function GET() {
   const sb = getSupabase();
+  const maintenanceRes = await sb
+    .from("settings")
+    .select("value")
+    .eq("key", "maintenance_mode")
+    .maybeSingle();
+  if (
+    maintenanceRes.data &&
+    String(maintenanceRes.data.value).toLowerCase() === "true"
+  ) {
+    return json({ items: [], maintenance: true });
+  }
   const res = await sb
     .from("inventory")
     .select("id, name, price, active")

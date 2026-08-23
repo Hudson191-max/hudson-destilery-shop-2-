@@ -103,6 +103,7 @@ INSERT INTO inventory (name, price, stock, cat) VALUES
 -- ── Seed: settings ───────────────────────────────────────────────────────
 INSERT INTO settings (key, value) VALUES
   ('site_closed',         'false'),
+  ('maintenance_mode',    'false'),
   ('site_closed_message', 'Orders are temporarily paused. Please check back soon.'),
   ('discord_link',        'https://discord.gg/anAmr5MQF'),
   ('auth_whitelist',      '{"employee":["hudson","maria","sam","jordan"],"owner":["hudson","owner"]}');

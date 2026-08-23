@@ -6,9 +6,14 @@ import { json } from "@/lib/api-helpers";
 // so the page also works against a database that uses the opposite convention.
 export async function GET() {
   const sb = getSupabase();
-  const [closedRes, openRes, messageRes, discordRes] = await Promise.all([
+  const [closedRes, openRes, maintenanceRes, messageRes, discordRes] = await Promise.all([
     sb.from("settings").select("value").eq("key", "site_closed").maybeSingle(),
     sb.from("settings").select("value").eq("key", "site_open").maybeSingle(),
+    sb
+      .from("settings")
+      .select("value")
+      .eq("key", "maintenance_mode")
+      .maybeSingle(),
     sb
       .from("settings")
       .select("value")
@@ -34,5 +39,9 @@ export async function GET() {
       ? discordRes.data.value
       : "https://discord.gg/anAmr5MQF";
 
-  return json({ closed, message, discordLink });
+  const maintenance =
+    maintenanceRes.data &&
+    String(maintenanceRes.data.value).toLowerCase() === "true";
+
+  return json({ closed, maintenance, message, discordLink });
 }

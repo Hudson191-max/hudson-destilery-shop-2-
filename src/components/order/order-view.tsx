@@ -18,6 +18,7 @@ type InventoryItem = { id: number | string; name: string; price: number };
 
 interface SiteStatus {
   closed: boolean;
+  maintenance: boolean;
   message: string;
   discordLink: string;
 }
@@ -597,6 +598,7 @@ function DiscordLink({ href }: { href: string }) {
 export default function OrderView() {
   const [siteStatus, setSiteStatus] = useState<SiteStatus>({
     closed: false,
+    maintenance: false,
     message: "Orders are temporarily paused. Please check back soon.",
     discordLink: "",
   });
@@ -633,6 +635,7 @@ export default function OrderView() {
         const s = statusRes.value;
         setSiteStatus({
           closed: !!s.closed,
+          maintenance: !!s.maintenance,
           message:
             s.message || "Orders are temporarily paused. Please check back soon.",
           discordLink: s.discordLink || "",
@@ -705,6 +708,10 @@ export default function OrderView() {
   }
 
   async function handleSubmit(): Promise<void> {
+    if (siteStatus.maintenance) {
+      toast("The order site is temporarily offline for maintenance.", "err");
+      return;
+    }
     if (siteStatus.closed) {
       toast("Orders are currently closed. Please try again later.", "err");
       return;
@@ -837,7 +844,7 @@ export default function OrderView() {
     }
   }
 
-  const closed = siteStatus.closed;
+  const closed = siteStatus.closed || siteStatus.maintenance;
   const summaryLines: OrderLine[] = Object.entries(cart)
     .filter(([, q]) => q > 0)
     .map(([k, q]) => {
@@ -899,16 +906,20 @@ export default function OrderView() {
                   fontFamily: "var(--font-head)",
                   fontSize: 20,
                   fontWeight: 700,
-                  color: "var(--red)",
+                  color: siteStatus.maintenance ? "var(--accent)" : "var(--red)",
                   marginBottom: 6,
                 }}
               >
-                🛑 Orders temporarily paused
+                {siteStatus.maintenance
+                  ? "🔧 Site temporarily offline"
+                  : "🛑 Orders temporarily paused"}
               </div>
               <div
                 style={{ fontSize: 14, color: "var(--text1)", lineHeight: 1.6 }}
               >
-                {siteStatus.message}
+                {siteStatus.maintenance
+                  ? "The order site is temporarily offline for maintenance. Please check back soon."
+                  : siteStatus.message}
               </div>
             </div>
             <div style={{ marginTop: 8, marginBottom: 24 }}>
