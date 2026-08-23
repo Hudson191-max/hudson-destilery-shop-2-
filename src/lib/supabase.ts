@@ -1,11 +1,18 @@
+// The Supabase package is provided by the application's dependency install.
+// @ts-expect-error The editor may report this while dependencies are not installed.
 import { createClient } from "@supabase/supabase-js";
 
 // Supabase credentials for The Hudson Distillery backend.
-// These are used SERVER-SIDE only so the anon key never ships to the client
-// and we can strip sensitive fields before returning data to the browser.
-export const SUPA_URL = "https://vsnwtvnxugogghxpsgkh.supabase.co";
-const SUPA_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzbnd0dm54dWdvZ2doeHBzZ2toIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMTMwNjcsImV4cCI6MjA5Nzc4OTA2N30.9WpxzBBwKi_WB3xKZrqx8aAGVP-dNWjAR6fzvRLIZcg";
+// These are used SERVER-SIDE only; never commit the service-role key.
+const runtimeEnv = (globalThis as typeof globalThis & {
+  process?: { env?: Record<string, string | undefined> };
+}).process?.env;
+const SUPA_URL = runtimeEnv?.SUPABASE_URL;
+const SUPA_KEY = runtimeEnv?.SUPABASE_SECRET_KEY;
+
+if (!SUPA_URL || !SUPA_KEY) {
+  throw new Error("SUPABASE_URL and SUPABASE_SECRET_KEY must be configured");
+}
 
 // Minimal Database type so the query builder knows our table shapes (avoids
 // the default `never` inference from untyped tables). Each table must declare

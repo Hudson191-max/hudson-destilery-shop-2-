@@ -54,6 +54,7 @@ CREATE TABLE inventory (
 );
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public read inventory" ON inventory FOR SELECT USING (true);
+CREATE POLICY "server manage inventory" ON inventory FOR ALL USING (true) WITH CHECK (true);
 
 -- ── settings ─────────────────────────────────────────────────────────────
 CREATE TABLE settings (
@@ -62,6 +63,7 @@ CREATE TABLE settings (
 );
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "public read settings" ON settings FOR SELECT USING (true);
+CREATE POLICY "server manage settings" ON settings FOR ALL USING (true) WITH CHECK (true);
 
 -- ── stock_log ────────────────────────────────────────────────────────────
 CREATE TABLE stock_log (
@@ -73,6 +75,8 @@ CREATE TABLE stock_log (
   date TEXT
 );
 ALTER TABLE stock_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "server read stock log" ON stock_log FOR SELECT USING (true);
+CREATE POLICY "server insert stock log" ON stock_log FOR INSERT WITH CHECK (true);
 
 -- ── auth ─────────────────────────────────────────────────────────────────
 CREATE TABLE auth (
@@ -81,6 +85,7 @@ CREATE TABLE auth (
   salt          TEXT NOT NULL
 );
 ALTER TABLE auth ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "server read auth" ON auth FOR SELECT USING (true);
 
 -- ── Seed: inventory ──────────────────────────────────────────────────────
 INSERT INTO inventory (name, price, stock, cat) VALUES
