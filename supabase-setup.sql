@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS inventory CASCADE;
 DROP TABLE IF EXISTS stock_log CASCADE;
 DROP TABLE IF EXISTS settings CASCADE;
 DROP TABLE IF EXISTS auth CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
 
 -- ── orders ───────────────────────────────────────────────────────────────
 CREATE TABLE orders (
@@ -87,6 +88,17 @@ CREATE TABLE auth (
 );
 ALTER TABLE auth ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "server read auth" ON auth FOR SELECT USING (true);
+
+-- ── messages ──────────────────────────────────────────────────────────────
+CREATE TABLE messages (
+  id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  author    TEXT NOT NULL,
+  content   TEXT NOT NULL,
+  created_at BIGINT NOT NULL DEFAULT (extract(epoch from now())::bigint * 1000)
+);
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read messages" ON messages FOR SELECT USING (true);
+CREATE POLICY "server insert messages" ON messages FOR INSERT WITH CHECK (true);
 
 -- ── Seed: inventory ──────────────────────────────────────────────────────
 INSERT INTO inventory (name, price, stock, cat) VALUES

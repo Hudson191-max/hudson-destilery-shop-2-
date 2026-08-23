@@ -38,9 +38,10 @@ import {
   WhitelistModal,
 } from "./modals";
 import { OrderDetailModal } from "./order-detail";
+import { ChatPanel } from "./chat-panel";
 
 type Role = "employee" | "owner" | "customer";
-type Page = "dashboard" | "inventory" | "needed" | "stock-log" | "track" | "history" | "payroll";
+type Page = "dashboard" | "inventory" | "needed" | "stock-log" | "track" | "history" | "payroll" | "chat";
 
 interface ConfettiPiece {
   id: number;
@@ -622,6 +623,7 @@ export default function AdminApp() {
         { id: "inventory", icon: "📦", label: "Inventory" },
         { id: "needed", icon: "🛒", label: "What we need" },
         { id: "stock-log", icon: "📝", label: "Stock log" },
+        { id: "chat", icon: "💬", label: "Chat" },
         ...(isOwner
           ? [
               { id: "payroll" as Page, icon: "💰", label: "Payroll" },
@@ -913,6 +915,11 @@ export default function AdminApp() {
             <HistoryPage orders={orders} />
           ) : null}
           {page === "payroll" && isOwner ? <PayrollPage /> : null}
+          {page === "chat" ? (
+            <div className="h-[600px]">
+              <ChatPanel currentUser={user} />
+            </div>
+          ) : null}
         </main>
       </div>
 
