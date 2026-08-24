@@ -1,5 +1,6 @@
 import { getSupabase } from "./supabase";
 import { CURRENCY, type OrderLine } from "./types";
+import sharp from "sharp";
 
 // ── Discord webhook helper ───────────────────────────────────────────────────
 // Two separate webhook URLs are supported so staff can route notifications to
@@ -73,21 +74,79 @@ function buildOrderEmbed(d: OrderNotificationData) {
   };
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+async function buildReceiptImage(d: OrderNotificationData): Promise<Buffer> {
+  const rowHeight = 34;
+  const top = 190;
+  const height = top + d.lines.length * rowHeight + 130;
+  const rows = d.lines
+    .map((line, index) => {
+      const y = top + index * rowHeight;
+      const name = `${line.name} x${line.qty}`;
+      const price = `${(line.qty * line.price).toLocaleString()} ${CURRENCY}`;
+      return `<text x="40" y="${y}" class="item">${escapeXml(name)}</text>` +
+        `<text x="760" y="${y}" text-anchor="end" class="item">${escapeXml(price)}</text>` +
+        `<line x1="40" y1="${y + 12}" x2="760" y2="${y + 12}" class="rule"/>`;
+    })
+    .join("");
+  const totalY = top + d.lines.length * rowHeight + 34;
+  const svg = `<svg width="800" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    <style>
+      .title{font:700 25px Arial,sans-serif;fill:#171717}.sub{font:14px Arial,sans-serif;fill:#666}
+      .label{font:700 13px Arial,sans-serif;fill:#555}.value{font:13px Arial,sans-serif;fill:#171717}
+      .item{font:13px Arial,sans-serif;fill:#171717}.rule{stroke:#ddd;stroke-width:1}
+      .total{font:700 18px Arial,sans-serif;fill:#171717}
+    </style>
+    <rect width="800" height="${height}" fill="#fff"/>
+    <text x="40" y="48" class="title">THE HUDSON DISTILLERY</text>
+    <text x="40" y="72" class="sub">Order receipt #${escapeXml(String(d.orderId))} - ${new Date().toISOString().slice(0, 10)}</text>
+    <line x1="40" y1="92" x2="760" y2="92" class="rule"/>
+    <text x="40" y="125" class="label">Customer</text><text x="760" y="125" text-anchor="end" class="value">${escapeXml(d.customer)}</text>
+    <text x="40" y="151" class="label">Status</text><text x="760" y="151" text-anchor="end" class="value">Waiting on Payment</text>
+    ${rows}
+    <line x1="40" y1="${totalY - 12}" x2="760" y2="${totalY - 12}" stroke="#777" stroke-width="2"/>
+    <text x="40" y="${totalY + 18}" class="total">Total</text><text x="760" y="${totalY + 18}" text-anchor="end" class="total">${d.total.toLocaleString()} ${CURRENCY}</text>
+    <text x="40" y="${totalY + 62}" class="sub">Thanks for ordering with us. Keep this receipt for your records.</text>
+  </svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
 export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
   try {
     const url = await getOrderWebhookUrl();
     if (!url) return; // No webhook configured — silent no-op.
 
-    const payload = {
-      username: "Hudson Distillery",
-      content: `🥃 **New order #${d.orderId}** from **${d.customer}** — ${d.lines.length} item(s), ${d.total.toLocaleString()} ${CURRENCY}`,
-      embeds: [buildOrderEmbed(d)],
-    };
+    const form = new FormData();
+    form.append(
+      "payload_json",
+      JSON.stringify({
+        username: "Hudson Distillery",
+        content: `🥃 **New order #${d.orderId}** from **${d.customer}** — ${d.lines.length} item(s), ${d.total.toLocaleString()} ${CURRENCY}`,
+        embeds: [buildOrderEmbed(d)],
+      })
+    );
+    try {
+      const receipt = await buildReceiptImage(d);
+      form.append(
+        "file",
+        new Blob([receipt], { type: "image/png" }),
+        `order-${d.orderId}-receipt.png`
+      );
+    } catch {
+      // Keep the text notification if image rendering is unavailable.
+    }
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: form,
       cache: "no-store",
     });
     // Discord returns 204 No Content on success. Anything else we ignore —

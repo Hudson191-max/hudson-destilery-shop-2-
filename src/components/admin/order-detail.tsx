@@ -68,7 +68,7 @@ export function OrderDetailModal({
       }
       setEditLines(m);
     }
-  }, [open, order]);
+  }, [open, order?.id]);
 
   async function handleSaveEdit() {
     if (!order) return;

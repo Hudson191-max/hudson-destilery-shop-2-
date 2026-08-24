@@ -40,7 +40,7 @@ export function NewOrderModal({
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reset form whenever opened.
+  // Reset form when opened, but preserve in-progress input during polling.
   useEffect(() => {
     if (open) {
       setCustomer("");
@@ -50,7 +50,7 @@ export function NewOrderModal({
       setQty(1);
       setItemId(inventory[0]?.id ?? "");
     }
-  }, [open, inventory]);
+  }, [open]);
 
   const total = useMemo(() => orderTotal(lines), [lines]);
 
@@ -404,7 +404,7 @@ export function EditItemModal({ open, item, onClose, onDone }: EditItemProps) {
       setCat(item.cat);
       setActive(item.active !== false);
     }
-  }, [open, item]);
+  }, [open, item?.id]);
 
   async function submit() {
     if (!item) return;
@@ -562,7 +562,7 @@ export function RestockModal({
         setItemId(inventory[0]?.id ?? "");
       }
     }
-  }, [open, presetItemId, inventory]);
+  }, [open, presetItemId]);
 
   async function submit() {
     if (itemId === "" || !Number.isFinite(itemId)) {
@@ -688,7 +688,7 @@ export function SiteStatusModal({
       setMaintenanceValue(maintenance);
       setMsg(message || DEFAULT_CLOSED_MESSAGE);
     }
-  }, [open, closed, message]);
+  }, [open]);
 
   async function submit() {
     setSubmitting(true);
@@ -830,7 +830,7 @@ export function DiscordModal({
       setWebhookUrl(currentWebhookUrl || "");
       setBackupWebhookUrl(currentBackupWebhookUrl || "");
     }
-  }, [open, currentUrl, currentWebhookUrl, currentBackupWebhookUrl]);
+  }, [open]);
 
   async function submit() {
     if (!url.trim()) {
