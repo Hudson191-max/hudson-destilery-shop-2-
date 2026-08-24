@@ -1,6 +1,10 @@
 import { getSupabase } from "./supabase";
+<<<<<<< HEAD
 import { CURRENCY, type OrderLine } from "./types";
 import sharp from "sharp";
+=======
+import { CURRENCY, LOGO_URL, type OrderLine } from "./types";
+>>>>>>> cde1fb31ffc602da3fcd5474b9d42a6c7e11c430
 
 // ── Discord webhook helper ───────────────────────────────────────────────────
 // Two separate webhook URLs are supported so staff can route notifications to
@@ -74,6 +78,7 @@ function buildOrderEmbed(d: OrderNotificationData) {
   };
 }
 
+<<<<<<< HEAD
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -117,6 +122,45 @@ async function buildReceiptImage(d: OrderNotificationData): Promise<Buffer> {
     <text x="40" y="${totalY + 62}" class="sub">Thanks for ordering with us. Keep this receipt for your records.</text>
   </svg>`;
   return sharp(Buffer.from(svg)).png().toBuffer();
+=======
+// ── Thank-you embed ──────────────────────────────────────────────────────────
+// Sent right after the order-info ping so the customer (and staff) get an
+// explicit "thanks for ordering" confirmation. Uses a distinct green accent
+// so it's visually obvious it's the thank-you, not the order ping.
+//
+// The embed intentionally repeats the order ID + total so the customer can
+// cross-reference with the order-info message above it in the channel.
+function buildThankYouEmbed(d: OrderNotificationData) {
+  const unitCount = d.lines.reduce((s, l) => s + l.qty, 0);
+
+  const fields: { name: string; value: string; inline?: boolean }[] = [
+    { name: "Order ID", value: `#${d.orderId}`, inline: true },
+    { name: "Total", value: `${d.total.toLocaleString()} ${CURRENCY}`, inline: true },
+    {
+      name: "Items",
+      value: `${d.lines.length} line(s) • ${unitCount} unit(s)`,
+      inline: true,
+    },
+  ];
+  if (d.contact)
+    fields.push({ name: "Contact on file", value: d.contact, inline: true });
+  if (d.steam)
+    fields.push({ name: "Steam ID", value: `\`${d.steam}\``, inline: true });
+
+  return {
+    title: `🙏 Thank You for Your Order, ${d.customer}!`,
+    description: [
+      `Hey **${d.customer}**, your order **#${d.orderId}** has been received and is now being prepared.`,
+      ``,
+      `We'll reach out to you shortly via the contact info you provided to arrange payment and delivery. Thanks for choosing The Hudson Distillery! 🥃`,
+    ].join("\n"),
+    color: 0x57f287, // Discord green
+    fields,
+    thumbnail: { url: LOGO_URL },
+    footer: { text: "The Hudson Distillery • Order Confirmed" },
+    timestamp: new Date().toISOString(),
+  };
+>>>>>>> cde1fb31ffc602da3fcd5474b9d42a6c7e11c430
 }
 
 export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
@@ -124,6 +168,7 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
     const url = await getOrderWebhookUrl();
     if (!url) return; // No webhook configured — silent no-op.
 
+<<<<<<< HEAD
     const form = new FormData();
     form.append(
       "payload_json",
@@ -149,11 +194,54 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
       body: form,
       cache: "no-store",
     });
+=======
+    // 1) Order-info ping (the original message).
+    const orderPayload = {
+      username: "Hudson Distillery",
+      content: `🥃 **New order #${d.orderId}** from **${d.customer}** — ${d.lines.length} item(s), ${d.total.toLocaleString()} ${CURRENCY}`,
+      embeds: [buildOrderEmbed(d)],
+    };
+
+    // 2) Thank-you message. Sent as a SEPARATE webhook POST (not bundled into
+    //    the order-info embed) so it shows up as its own message in the channel
+    //    and reads naturally as a "thanks for ordering" confirmation.
+    //    Sequential, not parallel — this guarantees the order-info lands above
+    //    the thank-you in the channel rather than the other way around.
+    const thankYouPayload = {
+      username: "Hudson Distillery",
+      content: `🙏 **Thank you for your order, ${d.customer}!**`,
+      embeds: [buildThankYouEmbed(d)],
+    };
+
+>>>>>>> cde1fb31ffc602da3fcd5474b9d42a6c7e11c430
     // Discord returns 204 No Content on success. Anything else we ignore —
-    // a broken webhook must not break order creation.
-    void res;
+    // a broken webhook must not break order creation. Each POST is wrapped in
+    // its own try/catch so a failure on the first does not skip the second.
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload),
+        cache: "no-store",
+      });
+      void res;
+    } catch {
+      // Network error on order-info — keep going so the thank-you still fires.
+    }
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(thankYouPayload),
+        cache: "no-store",
+      });
+      void res;
+    } catch {
+      // Network error on thank-you — silent.
+    }
   } catch {
-    // Network error, DNS failure, etc. — silent.
+    // Unexpected error (e.g. settings lookup failed) — silent.
   }
 }
 
