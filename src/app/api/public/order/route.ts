@@ -11,8 +11,8 @@ import { notifyNewOrder } from "@/lib/discord-webhook";
 
 export interface CreateOrderBody {
   customer: string;
-  contact?: string;
-  steam?: string;
+  contact: string;
+  steam: string;
   notes?: string;
   items: { itemId: number | string; qty: number }[];
   // Hidden honeypot: should stay empty. Helps filter naive bots.
@@ -46,6 +46,10 @@ export async function POST(req: Request) {
 
   const customer = (body.customer || "").trim();
   if (!customer) return errorJson("Enter your name.", 400);
+  const contact = (body.contact || "").trim();
+  if (!contact) return errorJson("Enter your contact information.", 400);
+  const steam = (body.steam || "").trim();
+  if (!steam) return errorJson("Enter your Steam ID 64.", 400);
 
   const items = Array.isArray(body.items) ? body.items : [];
   const cleanItems = items
@@ -129,8 +133,8 @@ export async function POST(req: Request) {
     .from("orders")
     .insert({
       customer,
-      contact: (body.contact || "").trim(),
-      steam: (body.steam || "").trim(),
+      contact,
+      steam,
       lines: JSON.stringify(lines),
       notes: (body.notes || "").trim(),
       status: "Preparing",

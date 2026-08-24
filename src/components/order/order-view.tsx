@@ -721,6 +721,14 @@ export default function OrderView() {
       toast("Enter your name", "err");
       return;
     }
+    if (!formDiscord.trim()) {
+      toast("Enter your contact information", "err");
+      return;
+    }
+    if (!formSteam.trim()) {
+      toast("Enter your Steam ID 64", "err");
+      return;
+    }
     const entries = Object.entries(cart).filter(([, q]) => q > 0);
     if (!entries.length) {
       toast("Select at least one item", "err");
@@ -999,7 +1007,7 @@ export default function OrderView() {
                   />
                 </div>
                 <div className="form-group">
-                  <label htmlFor="f-discord">Discord (optional)</label>
+                  <label htmlFor="f-discord">Discord / contact *</label>
                   <input
                     id="f-discord"
                     type="text"
@@ -1007,11 +1015,12 @@ export default function OrderView() {
                     onChange={(e) => setFormDiscord(e.target.value)}
                     placeholder="e.g. warrior#1234"
                     autoComplete="off"
+                    required
                   />
                 </div>
               </div>
               <div className="form-group">
-                <label htmlFor="f-steam">Steam ID 64 (optional)</label>
+                <label htmlFor="f-steam">Steam ID 64 *</label>
                 <input
                   id="f-steam"
                   type="text"
@@ -1019,6 +1028,7 @@ export default function OrderView() {
                   onChange={(e) => setFormSteam(e.target.value)}
                   placeholder="e.g. 76561199401090066"
                   autoComplete="off"
+                  required
                 />
               </div>
               <div className="form-group">
