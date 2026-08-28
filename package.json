@@ -1,6 +1,7 @@
 {
   "name": "hudson-distillery-shop",
   "version": "1.0.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
