@@ -7,17 +7,33 @@ import {
   type OrderLine,
 } from "@/lib/types";
 import { randomBytes } from "crypto";
+import { z } from "zod";
+import {
+  checkRateLimit,
+  recordAttempt,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { notifyNewOrder } from "@/lib/discord-webhook";
 
-export interface CreateOrderBody {
-  customer: string;
-  contact: string;
-  steam: string;
-  notes?: string;
-  items: { itemId: number | string; qty: number }[];
+// Zod schema — every public input is validated before it touches the DB.
+const createOrderSchema = z.object({
+  customer: z.string().min(1).max(100),
+  contact: z.string().min(1).max(200),
+  steam: z.string().min(1).max(100),
+  notes: z.string().max(1000).optional(),
+  items: z
+    .array(
+      z.object({
+        itemId: z.union([z.number(), z.string()]),
+        qty: z.number(),
+      })
+    )
+    .max(500),
   // Hidden honeypot: should stay empty. Helps filter naive bots.
-  company?: string;
-}
+  company: z.string().max(200).optional(),
+});
+
+export type CreateOrderBody = z.infer<typeof createOrderSchema>;
 
 // Cryptographically secure cancel code: 8 chars from [A-Z0-9] (excludes
 // ambiguous chars 0/O/1/I for readability). ~34^8 ≈ 1.8 trillion combinations.
@@ -32,12 +48,30 @@ function generateCancelCode(): string {
 }
 
 export async function POST(req: Request) {
-  let body: CreateOrderBody;
+  // Anti-spam quota: max 5 order submissions per IP per 10-minute window.
+  // Every attempt counts (successes included) so the endpoint can't be
+  // hammered — and neither can the Discord webhook it triggers.
+  const ip = getClientIp(req);
+  const rl = checkRateLimit("order", ip, { max: 5, windowMs: 10 * 60 * 1000 });
+  if (rl.locked) {
+    return errorJson(
+      `Too many orders submitted. Try again in ${rl.retryAfterMin} minute(s).`,
+      429
+    );
+  }
+  recordAttempt("order", ip, { max: 5, windowMs: 10 * 60 * 1000 });
+
+  let raw: unknown;
   try {
-    body = (await req.json()) as CreateOrderBody;
+    raw = await req.json();
   } catch {
     return errorJson("Invalid request body.", 400);
   }
+  const parsed = createOrderSchema.safeParse(raw);
+  if (!parsed.success) {
+    return errorJson("Invalid request body.", 400);
+  }
+  const body = parsed.data;
 
   // Honeypot — silently accept but do nothing if filled.
   if (body.company && body.company.trim().length > 0) {

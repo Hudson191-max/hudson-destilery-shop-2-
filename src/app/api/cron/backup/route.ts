@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/supabase";
 import { json, errorJson } from "@/lib/api-helpers";
+import { cleanupOldOrders } from "@/lib/cleanup";
 import { notifyBackupAttachment } from "@/lib/discord-webhook";
 
 // ── Daily backup cron (Vercel Cron) ──────────────────────────────────────────
@@ -24,6 +25,11 @@ export async function GET(req: Request) {
   }
 
   const sb = getSupabase();
+
+  // Primary cleanup run: purge closed orders older than 7 days BEFORE the
+  // snapshot so backups don't keep re-archiving stale rows.
+  await cleanupOldOrders();
+
   const [invRes, ordRes, logRes, setRes] = await Promise.all([
     sb.from("inventory").select("*").order("id"),
     sb.from("orders").select("*").order("id"),

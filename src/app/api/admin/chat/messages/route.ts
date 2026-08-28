@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import { json, errorJson, requireStaff } from "@/lib/api-helpers";
+import { etagJson, errorJson, requireStaff } from "@/lib/api-helpers";
 
 export interface ChatMessage {
   id: number;
@@ -25,6 +25,8 @@ export async function GET(req: Request) {
 
   if (error) return errorJson("Failed to fetch messages.", 500);
 
-  // Reverse to get chronological order (oldest first)
-  return json((data || []).reverse());
+  // Reverse to get chronological order (oldest first). ETag revalidation:
+  // this endpoint is polled every 2s — when nobody has sent a new message the
+  // poll is answered by a ~50-byte 304 instead of the full transcript.
+  return etagJson(req, (data || []).reverse());
 }

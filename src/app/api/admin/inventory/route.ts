@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase, type Database } from "@/lib/supabase";
 import { json, errorJson, requireOwner } from "@/lib/api-helpers";
 import { INVENTORY_CATEGORIES, todayISO } from "@/lib/types";
 
@@ -87,7 +87,12 @@ export async function PATCH(req: Request) {
 
   // Only touch `active` when the caller explicitly sent it. This keeps the
   // PATCH backward compatible with callers that don't know about the flag.
-  const patch: Record<string, unknown> = { name, price, stock, cat };
+  const patch: Database["public"]["Tables"]["inventory"]["Update"] = {
+    name,
+    price,
+    stock,
+    cat,
+  };
   if (body.active === true || body.active === false) {
     patch.active = body.active;
   }

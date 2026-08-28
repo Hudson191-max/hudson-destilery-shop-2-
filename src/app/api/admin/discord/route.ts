@@ -25,7 +25,8 @@ export async function POST(req: Request) {
   }
 
   const sb = getSupabase();
-  const updates: Promise<unknown>[] = [];
+  // Postgrest builders are thenable, not real Promises — type accordingly.
+  const updates: PromiseLike<unknown>[] = [];
 
   if (body.url !== undefined) {
     const url = (body.url || "").trim();

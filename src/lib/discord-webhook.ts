@@ -174,9 +174,10 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
     );
     try {
       const receipt = await buildReceiptImage(d);
+      // Wrap in Uint8Array — satisfies the BlobPart typing on newer TS libs.
       form.append(
         "file",
-        new Blob([receipt], { type: "image/png" }),
+        new Blob([new Uint8Array(receipt)], { type: "image/png" }),
         `order-${d.orderId}-receipt.png`
       );
     } catch {

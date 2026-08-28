@@ -1,14 +1,24 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
 import { getSupabase } from "./supabase";
+import { verifyPassword as verifyPw } from "./password";
 
 // ── Session token (HMAC-signed, stored in httpOnly cookie) ────────────────────
 // The session payload is { user, role, iat }. We never store/expose the password
 // hash, salt, or login results to the client.
 
-const SESSION_SECRET =
+// SECURITY: in production the session secret MUST be provided via env var.
+// The default below only exists so local/dev environments boot without setup.
+const isProd = process.env.NODE_ENV === "production";
+const SESSION_SECRET: string =
   process.env.HD_SESSION_SECRET ||
-  "hudson-distillery-dev-session-secret-change-me";
+  (isProd ? "" : "hudson-distillery-dev-session-secret-change-me");
+
+if (!SESSION_SECRET) {
+  throw new Error(
+    "HD_SESSION_SECRET must be configured in production. Generate one with: openssl rand -base64 32"
+  );
+}
 
 const COOKIE_NAME = "hd_session";
 
@@ -66,6 +76,7 @@ export async function setSession(payload: SessionPayload): Promise<void> {
   store.set(COOKIE_NAME, sign(payload), {
     httpOnly: true,
     sameSite: "lax",
+    secure: isProd, // never send the session cookie over plain HTTP in prod
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
@@ -77,42 +88,52 @@ export async function clearSession(): Promise<void> {
 }
 
 // ── Password verification (server-side only) ──────────────────────────────────
-// Mirrors the client-side SHA-256(salt + pw + salt) scheme used by the original,
-// but the hash/salt are never sent to the browser.
+// Delegates to lib/password.ts: scrypt for new hashes, with transparent
+// upgrade from the legacy SHA-256(salt + pw + salt) scheme. Hash/salt are
+// never sent to the browser.
 
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
+// Returns the account's stored role when username+password verify, else null.
+// The role stored on the account row is authoritative — the login screen's
+// role tab is only a UI preference (and the customer tab switches to the
+// public tracking UI), so a "wrong" tab can neither lock a valid user out
+// nor grant a role the account does not have.
 async function verifyPassword(
   username: string,
-  role: Exclude<Role, "customer">,
   pw: string
-): Promise<boolean> {
+): Promise<"employee" | "owner" | null> {
   const sb = getSupabase();
   const res = await sb
     .from("auth")
-    .select("role, password_hash, salt")
+    .select("username, role, password_hash, salt")
     .eq("username", username)
     .maybeSingle();
   // SECURITY: no logging of hash/salt/match results anywhere.
-  if (res.error || !res.data) return false;
-  if (String(res.data.role) !== role) return false;
-  const stored = String(res.data.password_hash || "");
-  const salt = String(res.data.salt || "");
-  const hash = await sha256Hex(salt + pw + salt);
-  if (!stored || !hash) return false;
-  try {
-    const a = Buffer.from(hash);
-    const b = Buffer.from(stored);
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
+  if (res.error || !res.data) return null;
+  const accountRole = res.data.role;
+  if (accountRole !== "employee" && accountRole !== "owner") return null;
+
+  // scrypt for new hashes; legacy sha256(salt+pw+salt) rows verify and are
+  // transparently upgraded to scrypt on successful login.
+  const result = verifyPw(pw, {
+    password_hash: String(res.data.password_hash || ""),
+    salt: String(res.data.salt || ""),
+  });
+  if (!result.ok) return null;
+
+  if (result.upgrade) {
+    try {
+      await sb
+        .from("auth")
+        .update({
+          password_hash: result.upgrade.password_hash,
+          salt: result.upgrade.salt,
+        })
+        .eq("username", username);
+    } catch {
+      // Upgrade is best-effort — never block a valid login on it.
+    }
   }
+  return accountRole;
 }
 
 // ── Whitelist (DB only — no localStorage overrides) ───────────────────────────
@@ -183,7 +204,9 @@ export async function attemptLogin(
     return { user: "Customer", role: "customer", iat: Date.now() };
   }
   if (!name || !pw) return null;
-  const ok = await verifyPassword(normalize(name), role, pw);
-  if (!ok) return null;
-  return { user: name, role, iat: Date.now() };
+  // The account row decides the session role (see verifyPassword above) —
+  // the selected tab cannot override it in either direction.
+  const accountRole = await verifyPassword(normalize(name), pw);
+  if (!accountRole) return null;
+  return { user: name, role: accountRole, iat: Date.now() };
 }

@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       content: content.trim(),
       created_at: Date.now(),
     })
-    .select()
+    .select("id, author, content, created_at")
     .single();
 
   if (error) return errorJson("Failed to send message.", 500);

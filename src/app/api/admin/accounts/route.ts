@@ -1,17 +1,11 @@
-import { randomBytes, createHash } from "crypto";
 import { getSupabase } from "@/lib/supabase";
 import { errorJson, json, requireOwner } from "@/lib/api-helpers";
+import { hashPassword } from "@/lib/password";
 
 type AccountRole = "employee" | "owner";
 
 function normalizeUsername(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "");
-}
-
-function hashPassword(salt: string, password: string): string {
-  return createHash("sha256")
-    .update(salt + password + salt)
-    .digest("hex");
 }
 
 export async function GET() {
@@ -42,11 +36,12 @@ export async function POST(req: Request) {
     return errorJson("Select a valid account role.", 400);
   if (password.length < 8) return errorJson("Password must be at least 8 characters.", 400);
 
-  const salt = randomBytes(16).toString("hex");
+  // scrypt hash with per-account random salt (stored inside password_hash).
+  const { password_hash, salt } = hashPassword(password);
   const res = await getSupabase().from("auth").insert({
     username,
     role: body.role,
-    password_hash: hashPassword(salt, password),
+    password_hash,
     salt,
   });
   if (res.error) return errorJson("That username is already in use.", 409);
@@ -90,10 +85,10 @@ export async function PATCH(req: Request) {
   if (!username) return errorJson("Username is required.", 400);
   if (password.length < 8) return errorJson("Password must be at least 8 characters.", 400);
 
-  const salt = randomBytes(16).toString("hex");
+  const { password_hash, salt } = hashPassword(password);
   const res = await getSupabase()
     .from("auth")
-    .update({ password_hash: hashPassword(salt, password), salt })
+    .update({ password_hash, salt })
     .eq("username", username);
   if (res.error) return errorJson("Could not reset password.", 500);
   return json({ ok: true });

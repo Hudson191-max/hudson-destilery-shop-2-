@@ -1,0 +1,79 @@
+// The Hudson Distillery — local development database schema.
+// Mirrors the production Supabase tables (see supabase-setup.sql) 1:1 so the
+// Supabase-compatible shim in src/lib/supabase.ts can serve every query the
+// app makes when Supabase credentials are not configured.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id          Int     @id @default(autoincrement())
+  customer    String
+  contact     String?
+  steam       String?
+  lines       String?
+  notes       String?
+  status      String  @default("Preparing")
+  date        String?
+  created_by  String?
+  cancel_code String?
+  closed_at   BigInt?
+
+  @@index([status])
+  @@index([closed_at])
+  @@map("orders")
+}
+
+model Inventory {
+  id     Int     @id @default(autoincrement())
+  name   String
+  price  Int     @default(0)
+  stock  Int     @default(0)
+  cat    String  @default("Other")
+  active Boolean @default(true)
+
+  @@map("inventory")
+}
+
+model Setting {
+  key   String  @id
+  value String?
+
+  @@map("settings")
+}
+
+model StockLog {
+  id   Int     @id @default(autoincrement())
+  type String?
+  text String?
+  who  String?
+  ts   String?
+  date String?
+
+  @@map("stock_log")
+}
+
+model Auth {
+  username      String @id
+  role          String
+  password_hash String
+  salt          String
+
+  @@map("auth")
+}
+
+model Message {
+  id         Int    @id @default(autoincrement())
+  author     String
+  content    String
+  created_at BigInt
+
+  @@index([created_at])
+  @@map("messages")
+}

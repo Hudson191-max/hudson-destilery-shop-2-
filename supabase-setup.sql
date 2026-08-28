@@ -3,16 +3,24 @@
 -- ════════════════════════════════════════════════════════════════════════
 -- Run this in your Supabase Dashboard → SQL Editor → New query → Run.
 --
--- ⚠️  This DROPS the existing (placeholder) tables named
---     orders, inventory, settings, stock_log, auth and recreates them with
---     the schema the recoded site expects. Any existing data in those tables
---     (e.g. "Test Item", the sample "admin" auth row) will be deleted.
+-- ⚠️  This DROPS the existing tables named orders, inventory, settings,
+--     stock_log, auth and messages and recreates them with the schema the
+--     site expects. Any existing data in those tables will be deleted.
 --     Back up first if you need it.
 --
+-- SECURITY MODEL (important):
+--   RLS is ENABLED on every table and NO public policies are created.
+--   That means the anon key can read nothing — by design. All data access
+--   happens server-side through the Next.js API routes using the
+--   service-role key (SUPABASE_SECRET_KEY), which bypasses RLS.
+--   Never expose the service-role key to the browser.
+--
 -- Default credentials created below:
---   👑 Owner   — name: hudson   password: hudson123
---   👷 Employee— name: maria    password: staff123
---   (Both are also added to the access whitelist.)
+--   👑 Owner    — name: hudson   password: hudson123
+--   👷 Employee — name: maria    password: staff123
+--   (Both are also added to the access whitelist. Password hashes use the
+--    legacy sha256(salt+pw+salt) scheme — the app transparently upgrades
+--    them to scrypt on first login.)
 -- ════════════════════════════════════════════════════════════════════════
 
 -- Drop incompatible placeholder tables (CASCADE to clear dependencies).
@@ -38,9 +46,7 @@ CREATE TABLE orders (
   closed_at   BIGINT
 );
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public read orders for tracking" ON orders FOR SELECT USING (true);
-CREATE POLICY "public insert orders"           ON orders FOR INSERT WITH CHECK (true);
-CREATE POLICY "public update orders cancel"    ON orders FOR UPDATE USING (true) WITH CHECK (true);
+-- No public policies: reads/writes go through the API with the service key.
 
 -- ── inventory ────────────────────────────────────────────────────────────
 CREATE TABLE inventory (
@@ -54,8 +60,6 @@ CREATE TABLE inventory (
   active BOOLEAN NOT NULL DEFAULT TRUE
 );
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public read inventory" ON inventory FOR SELECT USING (true);
-CREATE POLICY "server manage inventory" ON inventory FOR ALL USING (true) WITH CHECK (true);
 
 -- ── settings ─────────────────────────────────────────────────────────────
 CREATE TABLE settings (
@@ -63,8 +67,6 @@ CREATE TABLE settings (
   value TEXT
 );
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public read settings" ON settings FOR SELECT USING (true);
-CREATE POLICY "server manage settings" ON settings FOR ALL USING (true) WITH CHECK (true);
 
 -- ── stock_log ────────────────────────────────────────────────────────────
 CREATE TABLE stock_log (
@@ -76,8 +78,6 @@ CREATE TABLE stock_log (
   date TEXT
 );
 ALTER TABLE stock_log ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "server read stock log" ON stock_log FOR SELECT USING (true);
-CREATE POLICY "server insert stock log" ON stock_log FOR INSERT WITH CHECK (true);
 
 -- ── auth ─────────────────────────────────────────────────────────────────
 CREATE TABLE auth (
@@ -87,7 +87,6 @@ CREATE TABLE auth (
   salt          TEXT NOT NULL
 );
 ALTER TABLE auth ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "server read auth" ON auth FOR SELECT USING (true);
 
 -- ── messages ──────────────────────────────────────────────────────────────
 CREATE TABLE messages (
@@ -97,8 +96,6 @@ CREATE TABLE messages (
   created_at BIGINT NOT NULL DEFAULT (extract(epoch from now())::bigint * 1000)
 );
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "public read messages" ON messages FOR SELECT USING (true);
-CREATE POLICY "server insert messages" ON messages FOR INSERT WITH CHECK (true);
 
 -- ── Seed: inventory ──────────────────────────────────────────────────────
 INSERT INTO inventory (name, price, stock, cat) VALUES
@@ -128,5 +125,15 @@ INSERT INTO auth (username, role, password_hash, salt) VALUES
   ('hudson', 'owner', 'b51b0c27e5691b8804f0912014c0b01b433d444434209d0a3eaf4f3bd471c9e5', 'hdsalt2026'),
   ('maria', 'employee', 'a3a9da851e6ecba8fe647bbba8c6e5671c3d628630556ba2aa3df75c6abbd81f', 'hdsalt2026');
 
--- Done. The site at / (admin) and ?view=order (public order page) will now
--- work end to end against this database.
+-- Done. The storefront at / and the staff panel at /admin now work end to
+-- end against this database.
+
+-- ── Performance indexes (added: optimization pass) ────────────────────────
+-- The admin panel sorts/filters orders by status constantly and cleanup
+-- targets closed_at; messages are read newest-first. Without these indexes
+-- Postgres falls back to sequential scans as the tables grow.
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+CREATE INDEX IF NOT EXISTS idx_orders_closed_at ON orders (closed_at);
+CREATE INDEX IF NOT EXISTS idx_orders_id_desc ON orders (id DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_log_id_desc ON stock_log (id DESC);

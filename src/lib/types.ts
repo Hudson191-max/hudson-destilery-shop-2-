@@ -71,8 +71,8 @@ export const MAX_ITEMS_PER_ORDER = 1000;
 
 export const CURRENCY = "$";
 
-export const LOGO_URL =
-  "https://i.postimg.cc/0jB6HtW2/Chat-GPT-Image-25-mei-2026-11-35-47.png";
+// Self-hosted brand logo (served from /public — no external dependency).
+export const LOGO_URL = "/hudson-logo.png";
 
 export const INVENTORY_CATEGORIES = [
   "Weapons",
