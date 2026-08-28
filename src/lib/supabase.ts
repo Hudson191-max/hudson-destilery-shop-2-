@@ -7,7 +7,7 @@
 // fluent query-builder subset the app uses (from/select/eq/neq/in/gte/lte/lt/
 // order/limit/range/maybeSingle/single/insert/update/upsert/delete). All API
 // routes work unchanged against either backend.
-import { db } from "./db";
+import { getDb } from "./db";
 
 const runtimeEnv = (globalThis as typeof globalThis & {
   process?: { env?: Record<string, string | undefined> };
@@ -336,7 +336,7 @@ class LocalQuery {
   }
 
   private async run(): Promise<{ data: any; error: any }> {
-    const delegate = (db as any)[this.spec.model];
+    const delegate = (getDb() as any)[this.spec.model];
     if (!delegate)
       return { data: null, error: { message: `Unknown table "${this.table}".` } };
 

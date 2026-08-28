@@ -35,13 +35,23 @@ export async function POST(req: Request) {
 
   // SECURITY: on any failure we return the same generic message and never
   // reveal whether the name was whitelisted, the password was wrong, etc.
-  const session = await attemptLogin(role, body.name || "", body.pw || "");
-  if (!session) {
-    recordFailure("login", ip);
-    return errorJson("Invalid credentials.", 401);
-  }
+  try {
+    const session = await attemptLogin(role, body.name || "", body.pw || "");
+    if (!session) {
+      recordFailure("login", ip);
+      return errorJson("Invalid credentials.", 401);
+    }
 
-  clearFailures("login", ip);
-  await setSession(session);
-  return json({ user: session.user, role: session.role });
+    clearFailures("login", ip);
+    await setSession(session);
+    return json({ user: session.user, role: session.role });
+  } catch (err) {
+    // Misconfiguration (e.g. missing HD_SESSION_SECRET) must reach the owner
+    // as an actionable message — everything else stays generic. Full details
+    // go to the server logs.
+    console.error("[login] error:", err);
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.startsWith("HD_SESSION_SECRET")) return errorJson(msg, 500);
+    return errorJson("Login failed. Please try again.", 500);
+  }
 }

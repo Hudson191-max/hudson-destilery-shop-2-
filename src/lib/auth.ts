@@ -7,17 +7,27 @@ import { verifyPassword as verifyPw } from "./password";
 // The session payload is { user, role, iat }. We never store/expose the password
 // hash, salt, or login results to the client.
 
-// SECURITY: in production the session secret MUST be provided via env var.
-// The default below only exists so local/dev environments boot without setup.
 const isProd = process.env.NODE_ENV === "production";
-const SESSION_SECRET: string =
-  process.env.HD_SESSION_SECRET ||
-  (isProd ? "" : "hudson-distillery-dev-session-secret-change-me");
 
-if (!SESSION_SECRET) {
-  throw new Error(
-    "HD_SESSION_SECRET must be configured in production. Generate one with: openssl rand -base64 32"
-  );
+// SECURITY: in production the session secret MUST be provided via env var.
+// The dev default below only exists so local/dev environments boot without
+// setup.
+//
+// Resolved LAZILY (on first sign/verify) instead of at module import: `next
+// build` evaluates every route module with NODE_ENV=production while
+// collecting page data, so an import-time check would crash production
+// BUILDS on hosts where the env var is only injected at runtime. The
+// fail-hard semantics are preserved — any production request that actually
+// needs the secret still refuses to proceed.
+function sessionSecret(): string {
+  const secret = process.env.HD_SESSION_SECRET;
+  if (secret) return secret;
+  if (isProd) {
+    throw new Error(
+      "HD_SESSION_SECRET must be configured in production. Generate one with: openssl rand -base64 32"
+    );
+  }
+  return "hudson-distillery-dev-session-secret-change-me";
 }
 
 const COOKIE_NAME = "hd_session";
@@ -39,18 +49,25 @@ function b64decode(s: string): string {
 
 function sign(payload: SessionPayload): string {
   const body = b64encode(JSON.stringify(payload));
-  const sig = createHmac("sha256", SESSION_SECRET).update(body).digest("base64url");
+  const sig = createHmac("sha256", sessionSecret()).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 
 function verify(token: string | undefined | null): SessionPayload | null {
   if (!token) return null;
+  let secret: string;
+  try {
+    secret = sessionSecret();
+  } catch {
+    // Misconfigured production deploy (no HD_SESSION_SECRET): nothing can be
+    // verified, so every request is treated as unauthenticated (401) instead
+    // of crashing with a 500. The login route surfaces the real problem.
+    return null;
+  }
   const parts = token.split(".");
   if (parts.length !== 2) return null;
   const [body, sig] = parts;
-  const expected = createHmac("sha256", SESSION_SECRET)
-    .update(body)
-    .digest("base64url");
+  const expected = createHmac("sha256", secret).update(body).digest("base64url");
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
