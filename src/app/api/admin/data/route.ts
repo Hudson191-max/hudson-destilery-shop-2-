@@ -92,9 +92,16 @@ export async function GET(req: Request) {
     String(setting("maintenance_mode") || "").toLowerCase() === "true";
   const discordLink =
     setting("discord_link") || "https://discord.gg/anAmr5MQF";
-  const discordWebhookUrl = setting("discord_webhook_url") || "";
-  const discordBackupWebhookUrl =
-    setting("discord_backup_webhook_url") || "";
+  // Webhook URLs are secrets: anyone holding one can post as the shop's bot.
+  // Only the owner session receives them; employees get empty strings (the
+  // admin UI already treats an empty value as "not configured").
+  const webhooksVisible = session.role === "owner";
+  const discordWebhookUrl = webhooksVisible
+    ? setting("discord_webhook_url") || ""
+    : "";
+  const discordBackupWebhookUrl = webhooksVisible
+    ? setting("discord_backup_webhook_url") || ""
+    : "";
 
   // ETag revalidation: staff polls every 12s — unchanged data now costs a
   // 304 (no body) instead of re-transferring up to 1000 orders.

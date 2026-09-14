@@ -170,6 +170,9 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
         username: "Hudson Distillery",
         content: `🥃 **New order #${d.orderId}** from **${d.customer}** — ${d.lines.length} item(s), ${d.total.toLocaleString()} ${CURRENCY}`,
         embeds: [buildOrderEmbed(d)],
+        // Customer-supplied text lands in `content` — never let it ping roles
+        // or @everyone in the staff channel.
+        allowed_mentions: { parse: [] },
       })
     );
     try {
@@ -204,6 +207,7 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
       username: "Hudson Distillery",
       content: `🙏 **Thank you for your order, ${d.customer}!**`,
       embeds: [buildThankYouEmbed(d)],
+      allowed_mentions: { parse: [] },
     };
     try {
       const res = await fetch(url, {
