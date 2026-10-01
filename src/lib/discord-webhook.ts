@@ -247,6 +247,9 @@ export async function notifyBackupAttachment(
       JSON.stringify({
         username: "Hudson Distillery",
         content: `📦 **Daily backup** — ${new Date().toLocaleDateString("en-GB")} • ${filename}`,
+        // Same guard as the order pings: the filename/content must never ping
+        // roles or @everyone in the channel, now or if the text ever grows.
+        allowed_mentions: { parse: [] },
       })
     );
     form.append("file", new Blob([jsonContent], { type: "application/json" }), filename);
