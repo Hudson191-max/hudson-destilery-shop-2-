@@ -170,6 +170,9 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
         username: "Hudson Distillery",
         content: `🥃 **New order #${d.orderId}** from **${d.customer}** — ${d.lines.length} item(s), ${d.total.toLocaleString()} ${CURRENCY}`,
         embeds: [buildOrderEmbed(d)],
+        // Customer-supplied text lands in `content` — never let it ping roles
+        // or @everyone in the staff channel.
+        allowed_mentions: { parse: [] },
       })
     );
     try {
@@ -204,6 +207,7 @@ export async function notifyNewOrder(d: OrderNotificationData): Promise<void> {
       username: "Hudson Distillery",
       content: `🙏 **Thank you for your order, ${d.customer}!**`,
       embeds: [buildThankYouEmbed(d)],
+      allowed_mentions: { parse: [] },
     };
     try {
       const res = await fetch(url, {
@@ -243,6 +247,9 @@ export async function notifyBackupAttachment(
       JSON.stringify({
         username: "Hudson Distillery",
         content: `📦 **Daily backup** — ${new Date().toLocaleDateString("en-GB")} • ${filename}`,
+        // Same guard as the order pings: the filename/content must never ping
+        // roles or @everyone in the channel, now or if the text ever grows.
+        allowed_mentions: { parse: [] },
       })
     );
     form.append("file", new Blob([jsonContent], { type: "application/json" }), filename);

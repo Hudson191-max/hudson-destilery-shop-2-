@@ -4,8 +4,8 @@ import { getSupabase } from "./supabase";
 import { verifyPassword as verifyPw } from "./password";
 
 // ── Session token (HMAC-signed, stored in httpOnly cookie) ────────────────────
-// The session payload is { user, role, iat }. We never store/expose the password
-// hash, salt, or login results to the client.
+// The session payload is { user, role, iat, exp }. We never store/expose the
+// password hash, salt, or login results to the client.
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -32,12 +32,20 @@ function sessionSecret(): string {
 
 const COOKIE_NAME = "hd_session";
 
+// Sessions expire server-side as well as in the browser: the signed payload
+// carries an `exp` claim (same 7-day window as the cookie's maxAge) and
+// verify() rejects anything past it. Without this a leaked token stayed valid
+// forever, regardless of logout or password rotation.
+const SESSION_TTL_MS = 60 * 60 * 24 * 7;
+
 export type Role = "employee" | "owner" | "customer";
 
 export interface SessionPayload {
   user: string;
   role: Role;
   iat: number;
+  /** Unix ms after which the session is invalid (enforced server-side). */
+  exp: number;
 }
 
 function b64encode(s: string): string {
@@ -76,7 +84,13 @@ function verify(token: string | undefined | null): SessionPayload | null {
     return null;
   }
   try {
-    return JSON.parse(b64decode(body)) as SessionPayload;
+    const payload = JSON.parse(b64decode(body)) as SessionPayload;
+    // Server-side expiry: tokens minted before `exp` existed (or with a
+    // malformed claim) count as expired, so every session obeys the TTL.
+    if (typeof payload.exp !== "number" || !(payload.exp > Date.now())) {
+      return null;
+    }
+    return payload;
   } catch {
     return null;
   }
@@ -88,14 +102,20 @@ export async function getSession(): Promise<SessionPayload | null> {
   return verify(token);
 }
 
-export async function setSession(payload: SessionPayload): Promise<void> {
+export async function setSession(
+  payload: Omit<SessionPayload, "exp"> & { exp?: number }
+): Promise<void> {
   const store = await cookies();
-  store.set(COOKIE_NAME, sign(payload), {
+  const full: SessionPayload = {
+    ...payload,
+    exp: payload.exp ?? Date.now() + SESSION_TTL_MS,
+  };
+  store.set(COOKIE_NAME, sign(full), {
     httpOnly: true,
     sameSite: "lax",
     secure: isProd, // never send the session cookie over plain HTTP in prod
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: SESSION_TTL_MS / 1000,
   });
 }
 
@@ -218,12 +238,22 @@ export async function attemptLogin(
   pw: string
 ): Promise<SessionPayload | null> {
   if (role === "customer") {
-    return { user: "Customer", role: "customer", iat: Date.now() };
+    return {
+      user: "Customer",
+      role: "customer",
+      iat: Date.now(),
+      exp: Date.now() + SESSION_TTL_MS,
+    };
   }
   if (!name || !pw) return null;
   // The account row decides the session role (see verifyPassword above) —
   // the selected tab cannot override it in either direction.
   const accountRole = await verifyPassword(normalize(name), pw);
   if (!accountRole) return null;
-  return { user: name, role: accountRole, iat: Date.now() };
+  return {
+    user: name,
+    role: accountRole,
+    iat: Date.now(),
+    exp: Date.now() + SESSION_TTL_MS,
+  };
 }

@@ -13,10 +13,9 @@ export function ToastHost() {
           onClick={() => dismiss(t.id)}
         >
           <span>{t.type === "err" ? "✕ " : "✓ "}</span>
-          <span
-            // detail uses simple text; message may contain minimal markup (rare) — keep safe
-            dangerouslySetInnerHTML={{ __html: t.message }}
-          />
+          {/* Plain text only: toasts echo server-provided values, so rendering
+              markup here would be a stored-XSS sink. */}
+          <span>{t.message}</span>
           {t.detail ? (
             <div
               style={{

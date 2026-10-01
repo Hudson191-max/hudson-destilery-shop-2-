@@ -58,3 +58,6 @@ server.log
 /db/
 *.db
 *.db-journal
+
+# Keep the environment template committed (it holds no secrets).
+!.env.example

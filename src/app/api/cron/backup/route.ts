@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { getSupabase } from "@/lib/supabase";
 import { json, errorJson } from "@/lib/api-helpers";
 import { cleanupOldOrders } from "@/lib/cleanup";
@@ -20,7 +21,13 @@ export async function GET(req: Request) {
     return errorJson("CRON_SECRET not configured.", 500);
   }
   const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (token !== secret) {
+  // Constant-time compare — never leak the secret through response timing.
+  const tokenBuf = Buffer.from(token);
+  const secretBuf = Buffer.from(secret);
+  if (
+    tokenBuf.length !== secretBuf.length ||
+    !timingSafeEqual(tokenBuf, secretBuf)
+  ) {
     return errorJson("Unauthorized.", 401);
   }
 
