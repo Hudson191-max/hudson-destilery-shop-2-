@@ -67,7 +67,7 @@ export async function POST(req: Request) {
 
   await sb.from("stock_log").insert({
     type: "order",
-    text: `Order #${id} marked <strong>${status}</strong> by ${session.user}`,
+    text: `Order #${id} marked ${status} by ${session.user}`,
     who: session.user,
     ts: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     date: todayISO(),

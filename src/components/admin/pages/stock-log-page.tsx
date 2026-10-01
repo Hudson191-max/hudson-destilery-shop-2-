@@ -32,14 +32,11 @@ export function StockLogPage({
                   {e.ts || ""}
                 </div>
                 <div className={`log-dot log-dot-${e.type}`} />
-                <div
-                  className="log-text"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      e.text +
-                      ` <span class="log-who">${e.who || ""}</span>`,
-                  }}
-                />
+                {/* Plain text only: log text echoes customer/item names, so
+                    rendering markup here would be a stored-XSS sink. */}
+                <div className="log-text">
+                  {e.text} <span className="log-who">{e.who || ""}</span>
+                </div>
               </div>
             ))
           )}

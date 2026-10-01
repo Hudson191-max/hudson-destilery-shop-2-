@@ -8,12 +8,17 @@ import { json, errorJson, requireOwner } from "@/lib/api-helpers";
 //
 // The qty isn't stored as its own column (for backward compat with old logs),
 // so we parse it out of the `text` field. The text format is controlled by
-// /api/admin/inventory/restock/route.ts and always looks like:
+// /api/admin/inventory/restock/route.ts. Current format (plain text since the
+// 2026-10-01 XSS fix removed markup from stock_log):
 //
-//   <strong>USERNAME</strong> restocked <strong>ITEM NAME</strong> +QTY — note
+//   USERNAME restocked ITEM NAME +QTY — note
 //
-// The regex below extracts ITEM NAME and QTY. Rows that don't match (rare,
-// e.g. manually-edited text) are counted in `unparseable` so the owner knows
+// Older rows written before the fix still carry <strong> markup:
+//
+//   <strong>USERNAME</strong> restocked <strong>ITEM NAME</strong> +QTY
+//
+// The regex below accepts both. Rows that don't match (rare, e.g.
+// manually-edited text) are counted in `unparseable` so the owner knows
 // the total isn't 100% accurate.
 //
 // Query params:
@@ -33,9 +38,11 @@ interface EmployeeSummary {
   items: ItemBreakdown[];
 }
 
-// Matches: ...restocked <strong>ITEM NAME</strong> +QTY...
-// Item name can contain anything except the closing </strong> tag.
-const RESTOCK_RE = /restocked\s+<strong>(.+?)<\/strong>\s+\+(\d+)/i;
+// Matches both stock_log restock formats:
+//   new:  ...restocked ITEM NAME +QTY...
+//   old:  ...restocked <strong>ITEM NAME</strong> +QTY...
+// The <strong> tags are optional; the lazy name capture stops at " +<digits>".
+const RESTOCK_RE = /restocked\s+(?:<strong>)?(.+?)(?:<\/strong>)?\s+\+(\d+)/i;
 
 function parseQtyFromText(text: string | null | undefined): {
   name: string;

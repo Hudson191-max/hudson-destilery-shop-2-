@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const note = (body.note || "").trim();
   await sb.from("stock_log").insert({
     type: "add",
-    text: `<strong>${session.user}</strong> restocked <strong>${item.name}</strong> +${qty}${
+    text: `${session.user} restocked ${item.name} +${qty}${
       note ? ` — ${note}` : ""
     }`,
     who: session.user,

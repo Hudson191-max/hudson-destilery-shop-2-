@@ -53,9 +53,9 @@ export async function POST(req: Request) {
   const name = cur.data.name || `#${id}`;
   await sb.from("stock_log").insert({
     type: "edit",
-    text: `<strong>${session.user}</strong> ${
+    text: `${session.user} ${
       active ? "enabled" : "disabled"
-    } <strong>${name}</strong> for sale`,
+    } ${name} for sale`,
     who: session.user,
     ts: new Date().toLocaleTimeString("en-GB", {
       hour: "2-digit",

@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   await sb.from("stock_log").insert({
     type: "add",
-    text: `<strong>${session.user}</strong> added <strong>${name}</strong>`,
+    text: `${session.user} added ${name}`,
     who: session.user,
     ts: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     date: todayISO(),
@@ -102,7 +102,7 @@ export async function PATCH(req: Request) {
 
   await sb.from("stock_log").insert({
     type: "edit",
-    text: `<strong>${session.user}</strong> edited <strong>${name}</strong>${
+    text: `${session.user} edited ${name}${
       diff !== 0 ? ` stock ${diff > 0 ? "+" : ""}${diff}` : ""
     }`,
     who: session.user,
@@ -135,7 +135,7 @@ export async function DELETE(req: Request) {
 
   await sb.from("stock_log").insert({
     type: "remove",
-    text: `<strong>${session.user}</strong> removed <strong>${name}</strong>`,
+    text: `${session.user} removed ${name}`,
     who: session.user,
     ts: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     date: todayISO(),

@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   const total = lines.reduce((s, l) => s + l.qty * l.price, 0);
   await sb.from("stock_log").insert({
     type: "order",
-    text: `Order #${res.data.id} created for <strong>${customer}</strong> — ${total.toLocaleString()} R`,
+    text: `Order #${res.data.id} created for ${customer} — ${total.toLocaleString()} R`,
     who: session.user,
     ts: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
     date: todayISO(),
